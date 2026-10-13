@@ -9,7 +9,8 @@ export default defineConfig({
     setupFiles: ['test/setup-env.ts'],
     // All files share one schema, so they must not run at the same time.
     fileParallelism: false,
-    testTimeout: 30_000,
-    hookTimeout: 60_000,
+    // Generous: every query is a network round trip to the managed database.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
   },
 });

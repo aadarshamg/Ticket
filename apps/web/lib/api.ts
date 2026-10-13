@@ -30,7 +30,9 @@ interface ApiOptions {
 /** Calls the API on this origin. Throws ApiError for any non-2xx response. */
 export async function api<T>(path: string, { method = 'GET', body }: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // A FormData body (file upload) sets its own multipart Content-Type.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
   let res: Response;
@@ -38,7 +40,7 @@ export async function api<T>(path: string, { method = 'GET', body }: ApiOptions 
     res = await fetch(path, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       credentials: 'same-origin',
       cache: 'no-store',
     });

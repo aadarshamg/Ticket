@@ -8,6 +8,8 @@ import type { Admin, SessionResponse } from '@/lib/types';
 
 const NAV = [
   { href: '/admin', label: 'Overview' },
+  { href: '/admin/upload', label: 'Upload' },
+  { href: '/admin/bookings', label: 'Bookings' },
   { href: '/admin/settings', label: 'Settings' },
 ];
 

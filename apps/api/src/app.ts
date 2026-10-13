@@ -6,6 +6,8 @@ import { prisma } from './db';
 import { errorHandler, notFound } from './middleware/errors';
 import { authRouter } from './routes/auth';
 import { eventRouter } from './routes/event';
+import { ticketsRouter } from './routes/tickets';
+import { uploadsRouter } from './routes/uploads';
 
 export function createApp(): Express {
   const app = express();
@@ -33,6 +35,8 @@ export function createApp(): Express {
 
   app.use('/api/auth', authRouter());
   app.use('/api/event', eventRouter());
+  app.use('/api/uploads', uploadsRouter());
+  app.use('/api/tickets', ticketsRouter());
 
   app.use(notFound);
   app.use(errorHandler);

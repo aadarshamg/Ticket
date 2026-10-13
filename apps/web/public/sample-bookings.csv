@@ -1,0 +1,5 @@
+order_id,name,phone,passes,amount,category,email
+ORD-1001,Asha Rao,9876543210,4,3196,General,asha@example.com
+ORD-1002,Dev Shah,+91 98765 43211,1,799,General,
+ORD-1003,Meera Nair,09876543212,2,3998,VIP,meera@example.com
+ORD-1004,John Smith,+14155550123,2,1598,General,

@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { MulterError } from 'multer';
 import { ZodError } from 'zod';
+import { MAX_UPLOAD_BYTES } from '../config/constants';
 
 export interface ErrorDetail {
   path: string;
@@ -37,6 +39,11 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
     return send(res, 409, 'conflict', 'That value is already in use');
+  }
+  if (err instanceof MulterError) {
+    return err.code === 'LIMIT_FILE_SIZE'
+      ? send(res, 413, 'too_large', `The file is too large (maximum ${MAX_UPLOAD_BYTES / 1024 / 1024} MB)`)
+      : send(res, 400, 'invalid_file', 'Upload one spreadsheet file in the "file" field');
   }
   // body-parser errors
   if (err?.type === 'entity.parse.failed') {
