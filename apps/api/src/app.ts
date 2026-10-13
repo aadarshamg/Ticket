@@ -5,6 +5,7 @@ import { env } from './config/env';
 import { prisma } from './db';
 import { errorHandler, notFound } from './middleware/errors';
 import { authRouter } from './routes/auth';
+import { checkinsRouter } from './routes/checkins';
 import { eventRouter } from './routes/event';
 import { gateAuthRouter } from './routes/gateAuth';
 import { publicRouter } from './routes/public';
@@ -50,6 +51,7 @@ export function createApp(): Express {
   app.use('/api/public', publicRouter());
   app.use('/api/send', sendRouter());
   app.use('/api/scan', scanRouter());
+  app.use('/api/checkins', checkinsRouter());
 
   app.use(notFound);
   app.use(errorHandler);

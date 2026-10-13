@@ -148,6 +148,30 @@ describe('POST /api/scan', () => {
     expect((await gateB.post('/api/scan', { qr: signPass(passOf(ticket, 2).id) })).body.result).toBe('ok');
   });
 
+  it('repeats its answer when a phone asks again about the same scan, but not for a new scan', async () => {
+    const ticket = await createTicket({ orderId: 'ORD-1', name: 'Dev Shah', passCount: 2 });
+    const qr = signPass(passOf(ticket, 1).id);
+    const clientRef = randomUUID();
+
+    // The server admits, but suppose the answer never reaches the phone...
+    expect((await gateA.post('/api/scan', { qr, clientRef })).body.result).toBe('ok');
+    // ...so the phone asks again about the same scan (same ID): same answer, nothing counted twice.
+    const again = await gateA.post('/api/scan', { qr, clientRef });
+    expect(again.body).toMatchObject({ result: 'ok', booking: { name: 'Dev Shah', remaining: 1 }, pass: { passNo: 1 } });
+    expect(await prisma.checkin.count()).toBe(1);
+
+    // A different scan of that pass (someone else showing a copy) is still refused.
+    expect((await gateA.post('/api/scan', { qr, clientRef: randomUUID() })).body.result).toBe('already_used');
+    expect((await gateA.post('/api/scan', { qr })).body.result).toBe('already_used');
+    // An ID cannot be reused to get a second pass admitted for free.
+    const other = signPass(passOf(ticket, 2).id);
+    expect((await gateA.post('/api/scan', { qr: other, clientRef })).body.result).toBe('ok');
+    expect((await gateA.post('/api/scan', { qr: other, clientRef })).body.result).toBe('already_used');
+    // Every one of those attempts except the repeated answer is in the scan log.
+    expect(await prisma.checkin.count()).toBe(5);
+    expect(await prisma.checkin.count({ where: { result: 'ok' } })).toBe(2);
+  });
+
   it('admits exactly one person when the same pass is scanned at several gates at the same moment', async () => {
     const ticket = await createTicket({ orderId: 'ORD-1', passCount: 1 });
     const pass = passOf(ticket, 1);

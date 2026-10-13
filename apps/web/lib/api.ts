@@ -25,10 +25,12 @@ export function setCsrfToken(token: string | null): void {
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /** Give up (as a network error) if there is no answer within this time. */
+  timeoutMs?: number;
 }
 
 /** Calls the API on this origin. Throws ApiError for any non-2xx response. */
-export async function api<T>(path: string, { method = 'GET', body }: ApiOptions = {}): Promise<T> {
+export async function api<T>(path: string, { method = 'GET', body, timeoutMs }: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   // A FormData body (file upload) sets its own multipart Content-Type.
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
@@ -43,6 +45,7 @@ export async function api<T>(path: string, { method = 'GET', body }: ApiOptions 
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       credentials: 'same-origin',
       cache: 'no-store',
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     });
   } catch {
     throw new ApiError(0, 'network', 'Could not reach the server. Check your connection and try again.');

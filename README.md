@@ -4,9 +4,9 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 5 of 8** (admin login, event settings, spreadsheet upload with preview,
+> Build status: **Phase 6 of 8** (admin login, event settings, spreadsheet upload with preview,
 > bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook,
-> gate scanner). Deployment and the event-day checklist are documented in Phase 8.
+> gate scanner with offline mode). Deployment and the event-day checklist are documented in Phase 8.
 
 ## Layout
 
@@ -204,6 +204,48 @@ How it is kept safe:
 - Wrong PINs and scans are rate-limited (scans per device, so a busy gate is not slowed by others).
 
 The camera needs **https** (or `localhost`), so on real phones the site must be deployed.
+
+### Scanning without a connection
+
+Venue networks fail. The scanner is built to keep admitting people when they do.
+
+**Before the gates open, each volunteer should open `/scan` once with a connection and sign in.**
+That saves three things on the phone: the scanner page itself, the sign-in, and a list of every
+valid pass. The scanner shows "Saved list: 9,268 valid passes, updated 18:02" and refreshes it
+every two minutes while online. **Update list** refreshes it on demand.
+
+Then, per scan:
+
+1. The phone asks the server. With a normal connection this is the only step.
+2. If there is no answer within 2.5 seconds, the phone checks the code against its saved list.
+   A pass on the list is admitted at once (green, "Checked offline") and the entry is stored on
+   the phone. A pass this phone already admitted is refused (red).
+3. If the list cannot confirm the pass, the phone does not guess: it keeps waiting for the
+   server, and only if no answer ever comes shows "Not valid" (not on the list) or "Cannot check".
+4. Stored entries upload by themselves when the connection returns (checked every 15 seconds),
+   and the list is refreshed. The scanner shows how many are still waiting.
+
+A fully offline phone can reopen `/scan` and carry on without the PIN. **Find booking** and
+**Admit all remaining** need a connection.
+
+What makes this safe:
+
+- **The list cannot be turned into passes.** It holds a short hash of each valid QR code, not
+  the codes, pass IDs or any personal details. It is signed (ECDSA P-256) and the phone checks
+  the signature when downloading and again every time it loads the list.
+- **The server has the last word.** Uploaded entries carry the scanned QR text, and the server
+  verifies each one itself. It never trusts the phone's verdict.
+- **Nothing is counted twice.** Every scan has its own ID. If the server admits someone but its
+  answer is lost on the way, the phone's later upload (or a rescan) carries the same ID and is
+  recognised as the same entry.
+
+The unavoidable limit: two gates that are both offline cannot know about each other. The same
+pass shown at both will be admitted at both. Those cases, along with offline entries on a
+cancelled booking or a code that was not a real pass, appear in **Admin → Conflicts** once the
+phones upload. To keep them rare, keep phones online where possible; the list is at most two
+minutes old when a connection drops.
+
+Offline mode needs a production build (the service worker is not active under `npm run dev`).
 
 ## Notes
 

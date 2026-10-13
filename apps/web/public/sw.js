@@ -1,19 +1,20 @@
 /*
- * Service worker for the public pass pages (/b/{code} and /p/{code}).
+ * Service worker for the public pass pages (/b/{code}, /p/{code}) and the gate scanner (/scan).
  *
- * Goal: once a visitor has opened their pass, it keeps opening with no or poor signal at
- * the venue. It handles only pass pages, the site's build files and pass-page images;
- * admin pages, the scanner and all API calls go straight to the network.
+ * Goal: once a visitor has opened their pass, or a volunteer the scanner, it keeps opening
+ * with no or poor signal at the venue. It handles only those pages, the site's build files
+ * and pass-page images; admin pages and all API calls go straight to the network.
  *
  * Rule: saving a copy is best-effort. Storage can be full, disabled or blocked (private
  * browsing), so a failure to read or write the cache must never stop a page from loading.
  */
 
-const CACHE = 'passes-v1'; // must match CACHE in components/pass/PassPageShell.tsx
+const CACHE = 'passes-v1'; // must match PAGE_CACHE in lib/offline/precache.ts
 const NETWORK_TIMEOUT_MS = 4000;
 
 const sameOrigin = (url) => url.origin === self.location.origin;
 const isPassPage = (url) => sameOrigin(url) && /^\/(b|p)\/[^/]+\/?$/.test(url.pathname);
+const isScanPage = (url) => sameOrigin(url) && (url.pathname === '/scan' || url.pathname === '/scan/');
 const isBuildAsset = (url) => sameOrigin(url) && url.pathname.startsWith('/_next/static/');
 
 self.addEventListener('install', () => {
@@ -85,8 +86,8 @@ function keepAlive(event, work) {
   }
 }
 
-/** Pass pages: the network if it answers quickly (so entry status is fresh), else the saved copy. */
-async function passPage(event) {
+/** Saved pages: the network if it answers quickly (so the page is fresh), else the saved copy. */
+async function savedPage(event) {
   const { request } = event;
   const saved = await readSaved(request, { ignoreSearch: true });
 
@@ -145,8 +146,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
 
-  if (request.mode === 'navigate' && isPassPage(url)) {
-    event.respondWith(passPage(event));
+  if (request.mode === 'navigate' && (isPassPage(url) || isScanPage(url))) {
+    event.respondWith(savedPage(event));
   } else if (isBuildAsset(url)) {
     event.respondWith(buildAsset(event));
   } else if (request.destination === 'image' && !url.pathname.startsWith('/api/')) {

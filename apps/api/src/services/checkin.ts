@@ -66,10 +66,22 @@ function describe(info: PassInfo): Pick<ScanOutcome, 'booking' | 'pass'> {
 }
 
 /** Every scan attempt is logged, whatever its result. `passId` is null when the QR matched no pass. */
-function logCheckins(db: Prisma.TransactionClient | typeof prisma, session: GateSession, passIds: (string | null)[], result: CheckinResult) {
-  return db.checkin.createMany({
-    data: passIds.map((passId) => ({ passId, gate: session.gate, deviceId: session.deviceId, result })),
-  });
+async function logCheckins(
+  db: Prisma.TransactionClient | typeof prisma,
+  session: GateSession,
+  passIds: (string | null)[],
+  result: CheckinResult,
+  clientRef?: string,
+): Promise<void> {
+  const rows = passIds.map((passId) => ({ passId, gate: session.gate, deviceId: session.deviceId, result }));
+  if (!clientRef) {
+    await db.checkin.createMany({ data: rows });
+    return;
+  }
+  // clientRef is unique. If it is already taken (the scanner repeated itself, or misused an
+  // ID), still log the attempt, just without the reference: no scan goes unrecorded.
+  const saved = await db.checkin.createMany({ data: rows.map((row) => ({ ...row, clientRef })), skipDuplicates: true });
+  if (saved.count < rows.length) await db.checkin.createMany({ data: rows });
 }
 
 function auditAdmit(
@@ -98,12 +110,16 @@ function auditAdmit(
  * The check-in itself is ONE conditional UPDATE: the pass becomes "used" only if it is
  * "valid" at that instant. If two gates scan the same pass at once, the database lets
  * exactly one of those updates change the row; the other sees zero rows updated.
+ *
+ * `clientRef` is the scanner's own ID for this scan. If the answer never reaches the phone
+ * and it falls back to its offline list, the later sync carries the same ID and is
+ * recognised as this scan rather than counted as a second admission.
  */
-export async function scanPass(qr: unknown, session: GateSession): Promise<ScanOutcome> {
+export async function scanPass(qr: unknown, session: GateSession, clientRef?: string): Promise<ScanOutcome> {
   const passId = verifyQr(qr);
   if (!passId) {
     // Not something this server signed: forged, altered, or not a pass at all.
-    await logCheckins(prisma, session, [null], 'invalid');
+    await logCheckins(prisma, session, [null], 'invalid', clientRef);
     return { result: 'invalid' };
   }
 
@@ -117,7 +133,7 @@ export async function scanPass(qr: unknown, session: GateSession): Promise<ScanO
     // One further round trip: what to show, the scan log and the audit entry, all at once.
     const [info] = await Promise.all([
       loadPassInfo(passId),
-      logCheckins(prisma, session, [passId], 'ok'),
+      logCheckins(prisma, session, [passId], 'ok', clientRef),
       auditAdmit(prisma, session, 'checkin.scan', { type: 'Pass', id: passId }),
     ]);
     if (!info) return { result: 'ok' }; // removed in the same instant; the admission still stands
@@ -128,11 +144,17 @@ export async function scanPass(qr: unknown, session: GateSession): Promise<ScanO
   const info = await loadPassInfo(passId);
   if (!info) {
     // Correctly signed, but the pass no longer exists (its booking was reduced or removed).
-    await logCheckins(prisma, session, [null], 'invalid');
+    await logCheckins(prisma, session, [null], 'invalid', clientRef);
     return { result: 'invalid' };
   }
+  if (clientRef && info.status === 'used') {
+    // Was it this very scan that used the pass? That happens when the first answer was lost on
+    // the way to the phone and it asks again with the same ID. Give the same answer, once more.
+    const mine = await prisma.checkin.findUnique({ where: { clientRef }, select: { passId: true, result: true } });
+    if (mine?.result === 'ok' && mine.passId === passId) return { result: 'ok', ...describe(info) };
+  }
   const result: CheckinResult = info.status === 'cancelled' ? 'cancelled' : 'already_used';
-  await logCheckins(prisma, session, [passId], result);
+  await logCheckins(prisma, session, [passId], result, clientRef);
   return { result, ...describe(info) };
 }
 

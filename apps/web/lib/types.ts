@@ -171,6 +171,19 @@ export interface LookupResult {
   remaining: number;
 }
 
+/** Someone admitted by an offline scanner whose pass turned out not to be valid. */
+export interface Conflict {
+  id: string;
+  result: 'already_used' | 'cancelled' | 'invalid';
+  /** Where and when the person was let in offline. */
+  gate: string;
+  deviceId: string;
+  scannedAt: string;
+  booking: { orderId: string; name: string; passNo: number; passCount: number } | null;
+  /** The entry the pass is recorded against (for "already used": the other admission). */
+  recordedEntry: { gate: string | null; at: string } | null;
+}
+
 // --- Bookings --------------------------------------------------------------
 
 export type MessageStatus = 'unsent' | 'queued' | 'sent' | 'delivered' | 'read' | 'failed';

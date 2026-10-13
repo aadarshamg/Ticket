@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { registerServiceWorker, saveCurrentPage } from '@/lib/offline/precache';
 
-/** Must match CACHE in public/sw.js. */
-const CACHE = 'passes-v1';
 const RELOAD_AFTER_MS = 20_000;
 
 interface Props {
@@ -32,25 +31,10 @@ export function PassPageShell({ endsAt, initialOver, children }: Props) {
   }, [endsAt]);
 
   useEffect(() => {
-    // The dev server's assets change constantly; only cache real builds.
-    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
-    const firstVisit = !navigator.serviceWorker.controller;
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then(async () => {
-        // From the second visit on, the service worker caches as it serves. On the very first
-        // visit this page loaded before the worker existed, so store it (and its files) now.
-        if (!firstVisit || !('caches' in window)) return;
-        const cache = await caches.open(CACHE);
-        const assets = performance
-          .getEntriesByType('resource')
-          .map((entry) => entry.name)
-          .filter((url) => url.startsWith(`${location.origin}/_next/static/`));
-        await Promise.allSettled([
-          cache.add(new Request(location.pathname, { cache: 'reload' })),
-          ...assets.map((url) => cache.add(url)),
-        ]);
-      })
+    // From the second visit on, the service worker saves pages as it serves them. On the very
+    // first visit this page loaded before the worker existed, so save it (and its files) now.
+    registerServiceWorker()
+      .then((firstVisit) => (firstVisit ? saveCurrentPage({ includePage: true }) : undefined))
       .catch(() => undefined); // offline support is a bonus; never break the page over it
   }, []);
 

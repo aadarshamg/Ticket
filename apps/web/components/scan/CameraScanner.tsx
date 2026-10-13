@@ -9,6 +9,8 @@ const SAME_CODE_GAP_MS = 4000;
 interface Props {
   /** Called once per newly seen QR code. */
   onScan: (text: string) => void;
+  /** Called once the camera and the scanning code are running. */
+  onReady?: () => void;
 }
 
 /**
@@ -16,13 +18,15 @@ interface Props {
  * result is on screen; the same pass held in front of it is reported only once, so a green
  * "Admitted" is not followed by a red "Already used" for the same person.
  */
-export function CameraScanner({ onScan }: Props) {
+export function CameraScanner({ onScan, onReady }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(true);
   /** Bumped by the Try again button to start the camera afresh. */
   const [attempt, setAttempt] = useState(0);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +67,10 @@ export function CameraScanner({ onScan }: Props) {
           scanner.clear();
         };
         if (cancelled) await stop();
-        else setStarting(false);
+        else {
+          setStarting(false);
+          onReadyRef.current?.();
+        }
       } catch (err) {
         if (cancelled) return;
         const text = err instanceof Error ? err.message : String(err);

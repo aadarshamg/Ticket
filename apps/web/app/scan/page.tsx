@@ -6,10 +6,31 @@ import { LookupPanel } from '@/components/scan/LookupPanel';
 import { api, ApiError, setCsrfToken } from '@/lib/api';
 import { primeAudio, signal, type Signal } from '@/lib/feedback';
 import { formatIstTime } from '@/lib/ist';
+import { registerServiceWorker, saveCurrentPage } from '@/lib/offline/precache';
+import {
+  checkLocally,
+  downloadList,
+  dropPending,
+  loadSaved,
+  noteAdmitted,
+  offlineStatus,
+  syncPending,
+  type LocalVerdict,
+} from '@/lib/offline/scanner';
 import type { AdmitAllOutcome, GateSessionInfo, ScanBooking, ScanOutcome } from '@/lib/types';
 
 const DEVICE_KEY = 'tk_device_id';
+/** Lets the scanner reopen while offline: the server cannot be asked who is signed in. */
+const SESSION_KEY = 'tk_gate_session';
 const RESULT_MS = 3000;
+/** If the server has not answered by now, see whether the saved list can confirm the pass. */
+const LOCAL_FALLBACK_AFTER_MS = 2500;
+/** How long the server gets in total before the phone stops waiting for it. */
+const SERVER_ANSWER_TIMEOUT_MS = 20_000;
+/** A rescan of a pass with no answer yet, within this time, counts as the same scan. */
+const SAME_SCAN_RETRY_MS = 2 * 60 * 1000;
+const LIST_MAX_AGE_MS = 2 * 60 * 1000;
+const TICK_MS = 15_000;
 
 type Tone = 'green' | 'red' | 'amber' | 'grey';
 
@@ -69,6 +90,54 @@ function toView(outcome: ScanOutcome): ResultView {
   }
 }
 
+/** What fills the screen when the phone decided by itself, with no connection. */
+function toLocalView(verdict: LocalVerdict): ResultView {
+  switch (verdict.kind) {
+    case 'admitted':
+      return {
+        tone: 'green',
+        title: 'Admitted',
+        lines: ['Checked offline', 'Saved on this phone. It uploads when the connection returns.'],
+      };
+    case 'already':
+      return {
+        tone: 'red',
+        title: 'Already used',
+        lines: [`Scanned on this phone at ${formatIstTime(verdict.at)}`, 'Checked offline'],
+      };
+    case 'not_listed':
+      return {
+        tone: 'red',
+        title: 'Not valid',
+        lines: ['Not on this phone’s list of valid passes.', 'It may be already used, cancelled or fake. Do not admit.'],
+      };
+    case 'no_list':
+      return {
+        tone: 'grey',
+        title: 'Cannot check',
+        lines: ['There is no connection, and this phone has no saved list of passes.', 'Get a connection and press “Update list”.'],
+      };
+  }
+}
+
+function readStoredSession(): GateSessionInfo | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as GateSessionInfo) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSession(info: GateSessionInfo | null): void {
+  try {
+    if (info) localStorage.setItem(SESSION_KEY, JSON.stringify(info));
+    else localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // storage blocked: scanning still works, but the page cannot reopen offline
+  }
+}
+
 export default function ScanPage() {
   const [session, setSession] = useState<GateSessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,19 +148,110 @@ export default function ScanPage() {
   const [checking, setChecking] = useState(false);
   const [admitting, setAdmitting] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
+  const [online, setOnline] = useState(true);
+  const [offline, setOffline] = useState(offlineStatus());
+  const [listNote, setListNote] = useState<string | null>(null);
+  const [updatingList, setUpdatingList] = useState(false);
   const busyRef = useRef(false); // true while a scan is being checked or its result is showing
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The latest scan the phone has had no server answer for. */
+  const unansweredRef = useRef<{ qr: string; clientRef: string; at: number } | null>(null);
+  /** ID of the scan whose result is (or was last) on screen. */
+  const activeScanRef = useRef<string | null>(null);
+  /** Whether a result is on screen right now. */
+  const resultShownRef = useRef(false);
+  resultShownRef.current = result !== null;
 
-  // Already signed in on this phone?
+  const endSession = useCallback(() => {
+    setCsrfToken(null);
+    storeSession(null);
+    setSession(null);
+    setResult(null);
+    setLookupOpen(false);
+    busyRef.current = false;
+    setPinError('You have been signed out. Enter the gate PIN again.');
+  }, []);
+
+  // Who is signed in on this phone? Ask the server; if it cannot be reached, trust what was saved.
   useEffect(() => {
-    api<GateSessionInfo>('/api/auth/gate/me')
+    void registerServiceWorker().catch(() => undefined);
+    api<GateSessionInfo>('/api/auth/gate/me', { timeoutMs: 6000 })
       .then((info) => {
         setCsrfToken(info.csrfToken);
+        storeSession(info);
         setSession(info);
       })
-      .catch(() => undefined)
+      .catch((err: unknown) => {
+        const saved = readStoredSession();
+        if (err instanceof ApiError && err.status === 0 && saved) {
+          setCsrfToken(saved.csrfToken); // offline: carry on with the saved session
+          setSession(saved);
+        } else {
+          storeSession(null);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  /** Uploads stored check-ins, then refreshes the saved list. Quietly does nothing while offline. */
+  const refreshOffline = useCallback(
+    async (showProblems = false) => {
+      if (!navigator.onLine) {
+        if (showProblems) setListNote('No connection. The saved list stays in use.');
+        return;
+      }
+      const sync = await syncPending();
+      if (sync.sessionEnded) return endSession();
+      try {
+        await downloadList();
+        setOnline(true); // the server answered, whatever an earlier failed scan suggested
+        setListNote(
+          sync.conflicts > 0
+            ? `${sync.conflicts} offline ${sync.conflicts === 1 ? 'entry was' : 'entries were'} not valid. Tell the organiser.`
+            : null,
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) return endSession();
+        if (err instanceof ApiError && err.status === 0) setOnline(false);
+        if (showProblems) setListNote(err instanceof ApiError && err.status === 0 ? 'No connection. The saved list stays in use.' : 'The list could not be updated.');
+      } finally {
+        setOffline(offlineStatus());
+      }
+    },
+    [endSession],
+  );
+
+  // Once signed in: load what this phone saved, then keep the list fresh and check-ins uploaded.
+  useEffect(() => {
+    if (!session) return;
+    let stopped = false;
+    setOnline(navigator.onLine);
+
+    void loadSaved().then(() => {
+      if (stopped) return;
+      setOffline(offlineStatus());
+      void refreshOffline();
+    });
+
+    const tick = setInterval(() => {
+      const { list, pending } = offlineStatus();
+      const stale = !list || Date.now() - new Date(list.generatedAt).getTime() > LIST_MAX_AGE_MS;
+      if (navigator.onLine && (pending > 0 || stale)) void refreshOffline();
+    }, TICK_MS);
+    const goOnline = () => {
+      setOnline(true);
+      void refreshOffline();
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      stopped = true;
+      clearInterval(tick);
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, [session, refreshOffline]);
 
   // Keep the screen awake while scanning.
   useEffect(() => {
@@ -113,15 +273,6 @@ export default function ScanPage() {
       void lock?.release().catch(() => undefined);
     };
   }, [session]);
-
-  const endSession = useCallback(() => {
-    setCsrfToken(null);
-    setSession(null);
-    setResult(null);
-    setLookupOpen(false);
-    busyRef.current = false;
-    setPinError('You have been signed out. Enter the gate PIN again.');
-  }, []);
 
   const dismiss = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -146,22 +297,89 @@ export default function ScanPage() {
       if (busyRef.current) return;
       busyRef.current = true;
       setChecking(true);
+
+      // One ID per scan attempt, whichever way it ends up being checked. A rescan of a pass the
+      // phone never got an answer about reuses the ID, so the server can tell "the same scan,
+      // asked again" from "a second person with the same pass".
+      const earlier = unansweredRef.current;
+      const clientRef =
+        earlier && earlier.qr === qr && Date.now() - earlier.at < SAME_SCAN_RETRY_MS ? earlier.clientRef : crypto.randomUUID();
+      unansweredRef.current = { qr, clientRef, at: Date.now() };
+      activeScanRef.current = clientRef;
+
+      type Answer = { outcome: ScanOutcome } | { error: unknown };
+      const server: Promise<Answer> | null = navigator.onLine
+        ? api<ScanOutcome>('/api/scan', { method: 'POST', body: { qr, clientRef }, timeoutMs: SERVER_ANSWER_TIMEOUT_MS }).then(
+            (outcome) => ({ outcome }),
+            (error: unknown) => ({ error }),
+          )
+        : null;
+
+      /** Shows what the server said. Returns false if the server could not be reached at all. */
+      const useServerAnswer = (answer: Answer): boolean => {
+        if ('outcome' in answer) {
+          unansweredRef.current = null;
+          setOnline(true);
+          if (answer.outcome.result === 'ok') void noteAdmitted(qr);
+          show(toView(answer.outcome));
+          return true;
+        }
+        const err = answer.error;
+        if (err instanceof ApiError && err.status === 401) {
+          endSession();
+          return true;
+        }
+        if (err instanceof ApiError && err.status !== 0) {
+          // The server answered, but with a problem (for example "scanning too fast").
+          show({ tone: 'grey', title: 'Not checked', lines: [err.message] });
+          return true;
+        }
+        setOnline(false);
+        return false;
+      };
+
       try {
-        show(toView(await api<ScanOutcome>('/api/scan', { method: 'POST', body: { qr } })));
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return endSession();
-        show({
-          tone: 'grey',
-          title: err instanceof ApiError && err.status === 0 ? 'No connection' : 'Not checked',
-          lines: [
-            err instanceof ApiError && err.status !== 0 ? err.message : 'The pass could not be checked. Scan it again.',
-          ],
-        });
+        if (server) {
+          const quick = await Promise.race([
+            server,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), LOCAL_FALLBACK_AFTER_MS)),
+          ]);
+          if (quick && useServerAnswer(quick)) return;
+        }
+
+        // The server is slow or unreachable. Can the list saved on this phone settle it?
+        const verdict = await checkLocally(qr, clientRef);
+        setOffline(offlineStatus());
+        if (verdict.kind === 'admitted' || verdict.kind === 'already') {
+          show(toLocalView(verdict));
+          // If the server does answer after all, its word is final.
+          void server?.then(async (late) => {
+            if (!('outcome' in late)) return;
+            unansweredRef.current = null;
+            setOnline(true);
+            await dropPending(clientRef); // the server has its own record of this scan now
+            setOffline(offlineStatus());
+            if (activeScanRef.current !== clientRef || verdict.kind !== 'admitted') return;
+            if (late.outcome.result !== 'ok') {
+              show(toView(late.outcome)); // for example: used at another gate a moment ago
+            } else if (resultShownRef.current) {
+              // Same verdict, now with the name and the rest of the group: update without a second beep.
+              setResult(toView(late.outcome));
+              if (timerRef.current) clearTimeout(timerRef.current);
+              timerRef.current = setTimeout(dismiss, RESULT_MS);
+            }
+          });
+          return;
+        }
+
+        // The saved list cannot confirm this pass. Do not guess: wait for the server's own answer.
+        if (server && useServerAnswer(await server)) return;
+        show(toLocalView(verdict));
       } finally {
         setChecking(false);
       }
     },
-    [show, endSession],
+    [show, dismiss, endSession],
   );
 
   async function admitAll(booking: ScanBooking) {
@@ -205,6 +423,7 @@ export default function ScanPage() {
         // fine without it
       }
       setCsrfToken(info.csrfToken);
+      storeSession(info);
       setSession(info);
       setPin('');
     } catch (err) {
@@ -215,14 +434,28 @@ export default function ScanPage() {
   }
 
   async function signOut() {
+    const waiting = offlineStatus().pending;
+    if (
+      waiting > 0 &&
+      !window.confirm(`${waiting} offline check-in${waiting === 1 ? ' has' : 's have'} not been uploaded yet. They stay on this phone and upload after the next sign-in. Sign out anyway?`)
+    ) {
+      return;
+    }
     try {
-      await api('/api/auth/gate/logout', { method: 'POST' });
+      await api('/api/auth/gate/logout', { method: 'POST', timeoutMs: 5000 });
     } catch {
       // sign out locally regardless
     }
     setCsrfToken(null);
+    storeSession(null);
     setSession(null);
     setPinError(null);
+  }
+
+  async function updateList() {
+    setUpdatingList(true);
+    await refreshOffline(true);
+    setUpdatingList(false);
   }
 
   if (loading) {
@@ -267,6 +500,7 @@ export default function ScanPage() {
   }
 
   // --- Scanner -------------------------------------------------------------
+  const { list, pending, storageFailed } = offline;
   return (
     <main className="min-h-screen bg-slate-900 text-white">
       <header className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
@@ -279,21 +513,62 @@ export default function ScanPage() {
         </button>
       </header>
 
+      {!online && (
+        <p className="mx-auto mb-3 max-w-md px-4" role="status">
+          <span className="block rounded-xl bg-amber-400 px-3 py-2 text-sm font-semibold text-slate-900">
+            {list
+              ? 'No connection. Passes are being checked against the list saved on this phone.'
+              : 'No connection, and no saved list on this phone. Passes cannot be checked until it is back.'}
+          </span>
+        </p>
+      )}
+
       <div className="px-4">
-        <CameraScanner onScan={onScan} />
+        <CameraScanner onScan={onScan} onReady={() => void saveCurrentPage({ includePage: true })} />
       </div>
 
-      <div className="mx-auto max-w-md space-y-2 p-4">
+      <div className="mx-auto max-w-md space-y-3 p-4">
         <button
           type="button"
+          disabled={!online}
           onClick={() => {
             busyRef.current = true; // no scanning while looking a booking up
             setLookupOpen(true);
           }}
-          className="w-full rounded-xl bg-slate-700 px-4 py-3 text-base font-semibold"
+          className="w-full rounded-xl bg-slate-700 px-4 py-3 text-base font-semibold disabled:opacity-50"
         >
-          Find booking (no QR)
+          {online ? 'Find booking (no QR)' : 'Find booking needs a connection'}
         </button>
+
+        <div className="rounded-xl bg-slate-800 p-3 text-sm" data-testid="offline-status">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-slate-300">
+              {list
+                ? `Saved list: ${list.count.toLocaleString('en-IN')} valid passes, updated ${formatIstTime(list.generatedAt)}`
+                : 'No list saved on this phone yet'}
+            </p>
+            <button
+              type="button"
+              onClick={updateList}
+              disabled={updatingList}
+              className="shrink-0 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              {updatingList ? 'Updating…' : 'Update list'}
+            </button>
+          </div>
+          {pending > 0 && (
+            <p className="mt-2 font-semibold text-amber-300">
+              {pending} offline check-in{pending === 1 ? '' : 's'} waiting to upload
+            </p>
+          )}
+          {storageFailed && (
+            <p className="mt-2 font-semibold text-red-300">
+              This phone could not save a check-in. Keep this page open until it has uploaded.
+            </p>
+          )}
+          {listNote && <p className="mt-2 text-amber-200">{listNote}</p>}
+        </div>
+
         <p className="text-center text-xs text-slate-400">
           Green: let them in. Red or amber: do not admit. Each pass admits one person, once.
         </p>
