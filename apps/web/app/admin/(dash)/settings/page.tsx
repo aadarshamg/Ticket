@@ -251,7 +251,8 @@ export default function SettingsPage() {
         <div>
           <h2 className="font-semibold">Entry gates</h2>
           <p className="text-sm text-slate-500">
-            Volunteers sign in to the scanner with a gate&apos;s PIN (4 to 8 digits). PINs are stored
+            Volunteers open the scanner page (this site&apos;s address followed by <code>/scan</code>) on their
+            phone and sign in with a gate&apos;s PIN (4 to 8 digits; 6 is a good length). PINs are stored
             hashed and cannot be viewed later, so note each one when you set it.
           </p>
         </div>

@@ -27,6 +27,8 @@ const schema = z.object({
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
   ADMIN_SESSION_HOURS: z.coerce.number().int().min(1).max(168).default(12),
+  /** How long a gate volunteer stays signed in to the scanner. */
+  GATE_SESSION_HOURS: z.coerce.number().int().min(1).max(72).default(16),
 
   /** mock = log only; cloud = Meta WhatsApp Cloud API. */
   MESSAGE_SENDER: z.enum(['mock', 'cloud']).default('mock'),

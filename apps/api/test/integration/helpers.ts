@@ -5,7 +5,8 @@ import request from 'supertest';
 import { env } from '../../src/config/env';
 import { prisma } from '../../src/db';
 import { generateCode } from '../../src/lib/codes';
-import { hashPassword } from '../../src/lib/passwords';
+import { hashPassword, hashPin } from '../../src/lib/passwords';
+import { invalidateGateCache } from '../../src/services/gates';
 
 const TABLES = ['AuditLog', 'Checkin', 'Message', 'Pass', 'Ticket', 'Upload', 'AdminUser', 'Gate', 'Event'];
 
@@ -19,6 +20,7 @@ export async function resetDb(): Promise<void> {
   }
   const tables = TABLES.map((table) => `"${env.DB_SCHEMA}"."${table}"`).join(', ');
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`);
+  invalidateGateCache();
 }
 
 let cachedHash: string | undefined;
@@ -111,6 +113,29 @@ export async function createTicket(options: TicketOptions) {
     },
     include: { passes: true },
   });
+}
+
+/** Creates a gate with the given PIN, directly in the database. */
+export async function createGate(name: string, pin: string, active = true) {
+  const gate = await prisma.gate.create({ data: { name, pinHash: await hashPin(pin), active } });
+  invalidateGateCache();
+  return gate;
+}
+
+/** Signs a volunteer in with a gate PIN; returns a cookie-keeping agent and its CSRF token. */
+export async function gateSignIn(app: Express, pin: string, deviceId?: string) {
+  const agent = request.agent(app);
+  const res = await agent.post('/api/auth/gate').send({ pin, deviceId });
+  if (res.status !== 200) {
+    throw new Error(`Gate sign-in failed in test helper: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  const csrf = res.body.csrfToken as string;
+  return {
+    agent,
+    csrf,
+    deviceId: res.body.deviceId as string,
+    post: (path: string, body?: Record<string, unknown>) => agent.post(path).set('X-CSRF-Token', csrf).send(body),
+  };
 }
 
 /** Creates `count` single-pass bookings in three statements (for tests that need many). */

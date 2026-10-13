@@ -4,6 +4,7 @@ import { audit, type Actor } from '../lib/audit';
 import { hashPin, verifyHash } from '../lib/passwords';
 import { HttpError } from '../middleware/errors';
 import type { EventInput, GateInput } from '../schemas/event';
+import { invalidateGateCache } from './gates';
 
 const EVENT_ID = 1;
 
@@ -130,5 +131,7 @@ export async function saveSettings(input: EventInput, actor: Actor) {
     }
   }, TX_OPTIONS);
 
+  // A changed or removed gate must stop working for signed-in volunteers straight away.
+  invalidateGateCache();
   return getSettings();
 }

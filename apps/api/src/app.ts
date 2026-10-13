@@ -6,7 +6,9 @@ import { prisma } from './db';
 import { errorHandler, notFound } from './middleware/errors';
 import { authRouter } from './routes/auth';
 import { eventRouter } from './routes/event';
+import { gateAuthRouter } from './routes/gateAuth';
 import { publicRouter } from './routes/public';
+import { scanRouter } from './routes/scan';
 import { sendRouter } from './routes/send';
 import { ticketsRouter } from './routes/tickets';
 import { uploadsRouter } from './routes/uploads';
@@ -40,12 +42,14 @@ export function createApp(): Express {
     res.status(db ? 200 : 503).json({ ok: db, db });
   });
 
+  app.use('/api/auth/gate', gateAuthRouter());
   app.use('/api/auth', authRouter());
   app.use('/api/event', eventRouter());
   app.use('/api/uploads', uploadsRouter());
   app.use('/api/tickets', ticketsRouter());
   app.use('/api/public', publicRouter());
   app.use('/api/send', sendRouter());
+  app.use('/api/scan', scanRouter());
 
   app.use(notFound);
   app.use(errorHandler);

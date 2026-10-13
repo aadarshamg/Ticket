@@ -4,9 +4,9 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 4 of 8** (admin login, event settings, spreadsheet upload with preview,
-> bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook).
-> Deployment and the event-day checklist are documented in Phase 8.
+> Build status: **Phase 5 of 8** (admin login, event settings, spreadsheet upload with preview,
+> bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook,
+> gate scanner). Deployment and the event-day checklist are documented in Phase 8.
 
 ## Layout
 
@@ -175,6 +175,35 @@ To use a provider such as AiSensy or Interakt instead, implement the `MessageSen
 
 The worker runs inside the API process. To run it separately, set `RUN_WORKER=false` for the API
 and start `npm run worker`.
+
+## Gate scanner
+
+Volunteers open `/scan` on their phone, enter their gate's PIN (set in Admin → Settings), allow
+the camera, and point it at a pass. The whole screen shows the result:
+
+| Screen | Meaning |
+|---|---|
+| Green **Admitted** | Name, category, "Pass 2 of 4 · 2 still to come". **Admit all remaining (N)** admits the rest of the group in one tap. |
+| Red **Already used** | Time and gate of the first entry. Do not admit. |
+| Red **Invalid pass** | Not a pass issued by this system (forged, altered, or some other QR code). |
+| Amber **Cancelled** | The booking was cancelled. Do not admit. |
+
+It returns to the camera after 3 seconds, with a beep and vibration per result. **Find booking**
+admits by hand when a QR will not scan: search an exact order ID or the last 4 digits of the
+buyer's phone, then **Admit 1** or **Admit all**.
+
+How it is kept safe:
+
+- The server verifies the QR signature; nothing on the phone decides who gets in.
+- A check-in is one conditional database update (`... SET status='used' WHERE id=$1 AND
+  status='valid'`). If two gates scan the same pass at the same instant, exactly one succeeds.
+- Every attempt is stored in `Checkin` with gate, device and result, including invalid ones.
+- Volunteers see only a name, category and pass counts: no phone number, email or order ID.
+- A gate session ends when it expires (`GATE_SESSION_HOURS`, default 16), when the gate is
+  switched off, or as soon as its PIN is reset.
+- Wrong PINs and scans are rate-limited (scans per device, so a busy gate is not slowed by others).
+
+The camera needs **https** (or `localhost`), so on real phones the site must be deployed.
 
 ## Notes
 

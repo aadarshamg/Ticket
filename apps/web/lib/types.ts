@@ -129,6 +129,48 @@ export interface TestSendResult {
   results: { phone: string; ok: boolean; error: string | null }[];
 }
 
+// --- Gate scanner ----------------------------------------------------------
+
+export interface GateSessionInfo {
+  gate: string;
+  deviceId: string;
+  csrfToken: string;
+}
+
+export type ScanResultKind = 'ok' | 'already_used' | 'invalid' | 'cancelled';
+
+/** All a volunteer is shown about a booking: no phone, email or order ID. */
+export interface ScanBooking {
+  ticketId: string;
+  name: string;
+  category: string | null;
+  passCount: number;
+  /** Passes still valid (people still to come). */
+  remaining: number;
+}
+
+export interface ScanOutcome {
+  result: ScanResultKind;
+  booking?: ScanBooking;
+  pass?: { passNo: number; usedAt: string | null; usedGate: string | null };
+}
+
+export interface AdmitAllOutcome {
+  admitted: number;
+  cancelled: boolean;
+  booking: ScanBooking;
+}
+
+export interface LookupResult {
+  ticketId: string;
+  name: string;
+  category: string | null;
+  cancelled: boolean;
+  passCount: number;
+  entered: number;
+  remaining: number;
+}
+
 // --- Bookings --------------------------------------------------------------
 
 export type MessageStatus = 'unsent' | 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
