@@ -9,6 +9,7 @@ import { checkinsRouter } from './routes/checkins';
 import { eventRouter } from './routes/event';
 import { gateAuthRouter } from './routes/gateAuth';
 import { publicRouter } from './routes/public';
+import { auditRouter, exportRouter, statsRouter } from './routes/reports';
 import { scanRouter } from './routes/scan';
 import { sendRouter } from './routes/send';
 import { ticketsRouter } from './routes/tickets';
@@ -52,6 +53,9 @@ export function createApp(): Express {
   app.use('/api/send', sendRouter());
   app.use('/api/scan', scanRouter());
   app.use('/api/checkins', checkinsRouter());
+  app.use('/api/stats', statsRouter());
+  app.use('/api/export.csv', exportRouter());
+  app.use('/api/audit', auditRouter());
 
   app.use(notFound);
   app.use(errorHandler);

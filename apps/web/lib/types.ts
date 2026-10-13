@@ -184,6 +184,37 @@ export interface Conflict {
   recordedEntry: { gate: string | null; at: string } | null;
 }
 
+// --- Dashboard and activity log ---------------------------------------------
+
+export interface Stats {
+  generatedAt: string;
+  bookings: { total: number; active: number; cancelled: number };
+  passes: { total: number; valid: number; used: number; cancelled: number };
+  messages: { unsent: number; queued: number; sent: number; delivered: number; read: number; failed: number };
+  entered: number;
+  stillToCome: number;
+  gates: { gate: string; entered: number; lastEntryAt: string | null }[];
+  conflicts: number;
+}
+
+export interface AuditEntry {
+  id: string;
+  createdAt: string;
+  actorType: 'admin' | 'gate' | 'system';
+  actorLabel: string;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  meta: Record<string, unknown> | null;
+}
+
+export interface AuditList {
+  items: AuditEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 // --- Bookings --------------------------------------------------------------
 
 export type MessageStatus = 'unsent' | 'queued' | 'sent' | 'delivered' | 'read' | 'failed';

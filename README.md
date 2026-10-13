@@ -4,9 +4,10 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 6 of 8** (admin login, event settings, spreadsheet upload with preview,
+> Build status: **Phase 7 of 8** (admin login, event settings, spreadsheet upload with preview,
 > bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook,
-> gate scanner with offline mode). Deployment and the event-day checklist are documented in Phase 8.
+> gate scanner with offline mode, live dashboard, CSV export, activity log, data purge).
+> Deployment and the event-day checklist are documented in Phase 8.
 
 ## Layout
 
@@ -246,6 +247,51 @@ phones upload. To keep them rare, keep phones online where possible; the list is
 minutes old when a connection drops.
 
 Offline mode needs a production build (the service worker is not active under `npm run dev`).
+
+## Dashboard, export and activity log
+
+- **Admin → Overview** refreshes every 5 seconds: people entered and still to come, entries per
+  gate with the time of the last one, bookings and passes, and WhatsApp messages by status.
+- **Download CSV** (`GET /api/export.csv`) gives one row per booking: contact details, passes,
+  passes used and remaining, booking status, message status and error, first and last entry time
+  (IST) and the gates used. Cells that could be read as a spreadsheet formula are exported as
+  text. Each download is recorded in the activity log, because the file contains every buyer's
+  phone number.
+- **Admin → Activity** shows the audit log: uploads, booking edits and cancellations, sends and
+  resends, settings and gate changes, sign-ins, gate entries, exports. For booking edits it
+  records which fields changed, not the old or new values.
+
+## Data protection (DPDP Act 2023)
+
+What is held, and why:
+
+- Buyer name, phone, optional email, order ID, amount and category, taken from the organiser's
+  spreadsheet. They are used only to deliver passes, send the optional reminder and control entry.
+  The system sends no marketing messages and has no feature for it.
+- Uploaded spreadsheets are parsed in memory and never stored. The checked rows are kept only
+  until the upload is saved or for 24 hours, whichever comes first.
+- Phone numbers are shown in full only to signed-in organisers. Pass pages show none, gate
+  volunteers see a name, category and pass counts only, and server logs mask numbers.
+- QR codes and the scanners' offline lists contain no personal data.
+
+### Deleting the data: `npm run purge-data`
+
+**Run this 30 days after the event ends.** Put a reminder in your calendar on event day.
+
+```
+npm run purge-data                       # preview: lists what would be deleted, changes nothing
+npm run purge-data -- --confirm          # deletes, once 30 days have passed since the end time
+npm run purge-data -- --confirm --force  # deletes now, even if the 30 days have not passed
+```
+
+It permanently deletes every booking, pass, WhatsApp message record, scan record and upload, and
+strips identifying details (order IDs, email addresses typed at login) from the activity log.
+Event settings, gates, admin logins and the outline of the activity log (what happened and when)
+are kept. It runs as one transaction, records itself in the activity log with the counts, and
+cannot be undone, so download the CSV first if you are required to keep a record.
+
+Also delete, by hand: any CSV exports and spreadsheets on your own computers, and database
+backups held by your hosting provider once their retention allows it.
 
 ## Notes
 

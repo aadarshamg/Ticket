@@ -17,7 +17,8 @@
     "create-admin": "tsx src/scripts/create-admin.ts",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "purge-data": "tsx src/scripts/purge-data.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
