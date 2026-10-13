@@ -217,6 +217,10 @@ export default function BookingsPage() {
 
   const actions = (booking: Booking) => (
     <div className="flex gap-2">
+      {/* The buyer's own page, for checking what they see or helping them on a call. */}
+      <a href={`/b/${booking.code}`} target="_blank" rel="noopener noreferrer" className="btn-secondary px-3 py-1.5">
+        Passes
+      </a>
       <button type="button" className="btn-secondary px-3 py-1.5" onClick={() => setDialog({ kind: 'edit', booking })}>
         Edit
       </button>

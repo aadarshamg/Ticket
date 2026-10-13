@@ -4,9 +4,9 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 2 of 8** (admin login, event settings, spreadsheet upload with preview,
-> bookings table). Deployment, Meta Cloud API setup and the event-day checklist are documented
-> in Phase 8.
+> Build status: **Phase 3 of 8** (admin login, event settings, spreadsheet upload with preview,
+> bookings table, signed QR passes and the public pass pages). Deployment, Meta Cloud API setup
+> and the event-day checklist are documented in Phase 8.
 
 ## Layout
 
@@ -75,6 +75,33 @@ Details worth knowing:
   Excel drops the leading `+`. CSV files do not have this problem.
 - The Excel reader (`xlsx`, SheetJS) is installed from `cdn.sheetjs.com` rather than npm, because
   the copy on npm is an old release with known security advisories.
+
+## Pass pages and QR codes
+
+- `/b/{code}` – the buyer's page: every pass in the booking as a swipeable card with its QR
+  code, entry status, and a **Share this pass** button that opens WhatsApp with that pass's link.
+- `/p/{code}` – one pass, for a group member. It shows no buyer details, no other passes and no
+  link back to the booking; the API it reads from does not return them.
+- Neither page needs a login. The 12-character code in the link is the credential, so treat
+  links as secrets. Repeated wrong guesses from one address are rate-limited.
+- In Admin → Bookings, **Passes** opens a booking's page.
+
+QR codes contain `passId.signature`, where the signature is HMAC-SHA256 of the pass ID with
+`QR_SECRET` (first 16 bytes, base64url). There is no order ID, name or phone number in the code,
+and a QR that was not issued by this server fails verification. **Changing `QR_SECRET`
+invalidates every QR code already sent**, so set it once before sending and keep it safe.
+
+After the event's end time the pages show "Event over" and no QR codes.
+
+### Offline
+
+A service worker (`apps/web/public/sw.js`) saves each pass page the first time it is opened, so
+it opens again with no signal at the venue. When online it always tries the network first (so
+entry status is current) and falls back to the saved copy after 4 seconds. Saving is
+best-effort: if the phone's storage is full or blocked the page still works online.
+
+The service worker is only active in a production build (`npm run build -w apps/web`, then
+`npm run start -w apps/web`), not under `npm run dev`. It also needs HTTPS (or `localhost`).
 
 ## Notes
 

@@ -29,3 +29,30 @@ const istFormat = new Intl.DateTimeFormat('en-IN', {
 export function formatIst(iso: string): string {
   return istFormat.format(new Date(iso));
 }
+
+const istParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+function parts(iso: string): Record<string, string> {
+  return Object.fromEntries(istParts.formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
+}
+
+/** e.g. "Saturday, 14 Nov 2026" */
+export function formatIstDate(iso: string): string {
+  const p = parts(iso);
+  return `${p.weekday}, ${p.day} ${p.month} ${p.year}`;
+}
+
+/** 24-hour time, e.g. "18:00" */
+export function formatIstTime(iso: string): string {
+  const p = parts(iso);
+  return `${p.hour}:${p.minute}`;
+}
