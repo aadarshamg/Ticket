@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled URL (Supabase port 6543)
+  directUrl = env("DIRECT_URL") // direct URL, used by migrations
+}
+
+enum TicketStatus {
+  active
+  cancelled
+}
+
+enum PassStatus {
+  valid
+  used
+  cancelled
+}
+
+enum MessageStatus {
+  queued
+  sent
+  delivered
+  read
+  failed
+}
+
+enum CheckinResult {
+  ok
+  already_used
+  invalid
+  cancelled
+}
+
+enum UploadStatus {
+  pending
+  confirmed
+}
+
+enum ActorType {
+  admin
+  gate
+  system
+}
+
+/// Event settings. Single row, id is always 1.
+model Event {
+  id                  Int      @id @default(1)
+  name                String
+  organiserName       String
+  venue               String
+  city                String
+  startsAt            DateTime @db.Timestamptz(3)
+  gatesOpenAt         DateTime @db.Timestamptz(3)
+  endsAt              DateTime @db.Timestamptz(3)
+  logoUrl             String?
+  brandColour         String   @default("#4f46e5")
+  helplineNumber      String?
+  termsText           String   @default("")
+  maxPassesPerBooking Int      @default(10)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// An entry gate. Volunteers log in to /scan with the gate's PIN.
+model Gate {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  pinHash   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// A booking. One row of the organiser's spreadsheet.
+model Ticket {
+  id        String       @id @default(uuid()) @db.Uuid
+  orderId   String       @unique
+  code      String       @unique @db.Char(12)
+  name      String
+  phone     String
+  email     String?
+  passCount Int
+  amount    Decimal?     @db.Decimal(10, 2)
+  category  String?
+  status    TicketStatus @default(active)
+  uploadId  String       @db.Uuid
+  upload    Upload       @relation(fields: [uploadId], references: [id])
+  passes    Pass[]
+  messages  Message[]
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@index([phone])
+  @@index([status])
+}
+
+/// One person's entry. Admits exactly one person, once.
+model Pass {
+  id        String     @id @default(uuid()) @db.Uuid
+  ticketId  String     @db.Uuid
+  ticket    Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  passNo    Int
+  code      String     @unique @db.Char(12)
+  status    PassStatus @default(valid)
+  usedAt    DateTime?  @db.Timestamptz(3)
+  usedGate  String?
+  checkins  Checkin[]
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@unique([ticketId, passNo])
+  @@index([status])
+}
+
+/// One WhatsApp message per booking per template; a resend updates the row.
+model Message {
+  id          String        @id @default(uuid()) @db.Uuid
+  ticketId    String        @db.Uuid
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  waMessageId String?       @unique
+  template    String
+  status      MessageStatus @default(queued)
+  errorCode   String?
+  errorText   String?
+  attempts    Int           @default(0)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@unique([ticketId, template])
+  @@index([status])
+}
+
+/// Every scan attempt, including invalid ones (passId is null for those).
+model Checkin {
+  id        String        @id @default(uuid()) @db.Uuid
+  passId    String?       @db.Uuid
+  pass      Pass?         @relation(fields: [passId], references: [id], onDelete: SetNull)
+  gate      String
+  deviceId  String
+  result    CheckinResult
+  offline   Boolean       @default(false)
+  clientRef String?       @unique
+  scannedAt DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([passId])
+  @@index([gate, scannedAt])
+}
+
+model Upload {
+  id           String       @id @default(uuid()) @db.Uuid
+  fileName     String
+  uploadedById String       @db.Uuid
+  uploadedBy   AdminUser    @relation(fields: [uploadedById], references: [id])
+  rowCount     Int
+  validCount   Int
+  errorCount   Int
+  status       UploadStatus @default(pending)
+  previewRows  Json?
+  confirmedAt  DateTime?    @db.Timestamptz(3)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  tickets      Ticket[]
+}
+
+model AdminUser {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  name         String
+  lastLoginAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  uploads      Upload[]
+}
+
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  actorType  ActorType
+  actorId    String?
+  actorLabel String
+  action     String
+  entityType String?
+  entityId   String?
+  meta       Json?
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
