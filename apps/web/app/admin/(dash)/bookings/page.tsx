@@ -156,6 +156,51 @@ function StatusForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (
   );
 }
 
+// --- Send / resend dialog --------------------------------------------------
+
+function SendForm({ booking, onDone, onCancel }: { booking: Booking; onDone: () => void; onCancel: () => void }) {
+  const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const again = booking.messageStatus !== 'unsent';
+
+  async function send() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await api(`/api/tickets/${booking.id}/resend`, { method: 'POST' });
+      onDone();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Something went wrong');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-700">
+        {again ? 'Send the pass message again' : 'Send the pass message'} to {booking.name} at {booking.phone} (order{' '}
+        {booking.orderId}).
+      </p>
+      {booking.messageError && (
+        <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">Last attempt failed: {booking.messageError}</p>
+      )}
+      {message && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          {message}
+        </p>
+      )}
+      <div className="flex justify-end gap-3">
+        <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>
+          Not now
+        </button>
+        <button type="button" className="btn-primary" onClick={send} disabled={saving}>
+          {saving ? 'Queueing…' : again ? 'Resend' : 'Send'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Page ------------------------------------------------------------------
 
 export default function BookingsPage() {
@@ -168,7 +213,7 @@ export default function BookingsPage() {
   const [data, setData] = useState<BookingList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ kind: 'edit' | 'status'; booking: Booking } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'edit' | 'status' | 'send'; booking: Booking } | null>(null);
   const latestRequest = useRef(0);
 
   useEffect(() => {
@@ -216,11 +261,19 @@ export default function BookingsPage() {
   const items = data?.items ?? [];
 
   const actions = (booking: Booking) => (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       {/* The buyer's own page, for checking what they see or helping them on a call. */}
       <a href={`/b/${booking.code}`} target="_blank" rel="noopener noreferrer" className="btn-secondary px-3 py-1.5">
         Passes
       </a>
+      <button
+        type="button"
+        className="btn-secondary px-3 py-1.5"
+        disabled={booking.status === 'cancelled' || booking.messageStatus === 'queued'}
+        onClick={() => setDialog({ kind: 'send', booking })}
+      >
+        {booking.messageStatus === 'unsent' ? 'Send' : 'Resend'}
+      </button>
       <button type="button" className="btn-secondary px-3 py-1.5" onClick={() => setDialog({ kind: 'edit', booking })}>
         Edit
       </button>
@@ -342,7 +395,7 @@ export default function BookingsPage() {
       {pageCount > 1 && (
         <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
           <span>Page {page} of {pageCount.toLocaleString('en-IN')}</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-secondary px-3 py-1.5" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>
               Previous
             </button>
@@ -356,6 +409,11 @@ export default function BookingsPage() {
       <Dialog open={dialog?.kind === 'edit'} onClose={() => setDialog(null)} title="Edit booking">
         {dialog?.kind === 'edit' && (
           <EditForm key={dialog.booking.id} booking={dialog.booking} onDone={onSaved} onCancel={() => setDialog(null)} />
+        )}
+      </Dialog>
+      <Dialog open={dialog?.kind === 'send'} onClose={() => setDialog(null)} title="Send on WhatsApp?">
+        {dialog?.kind === 'send' && (
+          <SendForm key={dialog.booking.id} booking={dialog.booking} onDone={onSaved} onCancel={() => setDialog(null)} />
         )}
       </Dialog>
       <Dialog

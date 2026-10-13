@@ -4,9 +4,9 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 3 of 8** (admin login, event settings, spreadsheet upload with preview,
-> bookings table, signed QR passes and the public pass pages). Deployment, Meta Cloud API setup
-> and the event-day checklist are documented in Phase 8.
+> Build status: **Phase 4 of 8** (admin login, event settings, spreadsheet upload with preview,
+> bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook).
+> Deployment and the event-day checklist are documented in Phase 8.
 
 ## Layout
 
@@ -102,6 +102,79 @@ best-effort: if the phone's storage is full or blocked the page still works onli
 
 The service worker is only active in a production build (`npm run build -w apps/web`, then
 `npm run start -w apps/web`), not under `npm run dev`. It also needs HTTPS (or `localhost`).
+
+## Sending passes on WhatsApp
+
+Admin → **Send** queues messages; a worker sends them at a steady pace and records what happened.
+
+- **Send passes** – to bookings that have never been sent, optionally only the next *N* (oldest
+  first). Use this to send in batches: 10 as a test, then 200, then the rest. A booking that was
+  already sent is never sent again from here.
+- **Resend failed** – retries every booking whose message failed.
+- **Send / Resend** on a booking in Admin → Bookings – one booking, for example after fixing its
+  phone number.
+- **Test message** – sends the first booking's real message to your own numbers. The booking is
+  not marked as sent.
+- **Reminder** – `event_reminder_v1` to bookings that still have unused passes.
+- **Pause / Resume**, with live progress.
+
+How it behaves:
+
+- About 20 messages per second (`SEND_RATE_PER_SECOND`).
+- A temporary error (rate limit, outage, network) is retried up to 3 times, waiting 2 s, 4 s, 8 s.
+  A permanent one (number not on WhatsApp, template problem) is not retried.
+- If more than 10% of recent messages fail (after at least 10), sending **pauses itself**. The
+  waiting messages stay queued; fix the cause and press Resume.
+- Message status (sent → delivered → read, or failed with Meta's reason) comes back through the
+  webhook and is shown in Bookings.
+
+### Redis
+
+The queue lives in Redis (`REDIS_URL`).
+
+- With Docker: `docker compose up -d redis`.
+- On Windows without Docker: download a portable build from
+  <https://github.com/redis-windows/redis-windows/releases>, and put `redis-server.exe` and its
+  `.dll` files in `.tools/redis/` (git-ignored). `npm run dev` then starts it automatically;
+  `npm run redis` starts it on its own.
+
+In production use a managed Redis with persistence enabled, so queued messages survive a restart.
+
+### Test mode and real sending
+
+`MESSAGE_SENDER=mock` (the default) only writes each message to the server log. Nothing reaches
+WhatsApp, which makes it safe to try everything with demo data.
+
+To send for real:
+
+1. In Meta's WhatsApp Manager, create and get approval for the template in
+   [docs/whatsapp-template.md](docs/whatsapp-template.md).
+2. Set in `.env`:
+
+   | Variable | Where to find it |
+   |---|---|
+   | `MESSAGE_SENDER=cloud` | – |
+   | `WA_PHONE_NUMBER_ID` | Meta app → WhatsApp → API Setup → Phone number ID |
+   | `WA_ACCESS_TOKEN` | A permanent System User token with `whatsapp_business_messaging` |
+   | `WA_APP_SECRET` | Meta app → App settings → Basic → App secret |
+   | `WA_VERIFY_TOKEN` | Any long random string you invent |
+   | `WA_GRAPH_VERSION` | The API version shown in the Meta dashboard, e.g. `v23.0` |
+   | `PUBLIC_BASE_URL` | The site's real https address; it must match the template's button URL |
+
+3. Register the webhook (needs the site online with https): Meta app → WhatsApp → Configuration →
+   Callback URL `https://YOUR-DOMAIN/api/whatsapp/webhook`, Verify token = `WA_VERIFY_TOKEN`, and
+   subscribe to the **messages** field.
+4. Use **Test message** first, then a small batch.
+
+Every webhook POST must carry a valid `X-Hub-Signature-256` (HMAC-SHA256 of the body with
+`WA_APP_SECRET`); anything else is rejected with 401.
+
+To use a provider such as AiSensy or Interakt instead, implement the `MessageSender` interface
+(`apps/api/src/messaging/types.ts`) and return it from `getSender()` in
+`apps/api/src/messaging/index.ts`.
+
+The worker runs inside the API process. To run it separately, set `RUN_WORKER=false` for the API
+and start `npm run worker`.
 
 ## Notes
 

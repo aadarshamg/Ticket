@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { adminActor, requireAdmin, requireCsrf } from '../middleware/auth';
 import { HttpError } from '../middleware/errors';
 import { ticketListQuerySchema, ticketPatchSchema } from '../schemas/ticket';
+import { resendTicket } from '../services/sending';
 import { listTickets, updateTicket } from '../services/tickets';
 
 export function ticketsRouter(): Router {
@@ -20,6 +21,13 @@ export function ticketsRouter(): Router {
     if (!id.success) throw new HttpError(404, 'not_found', 'Booking not found');
     const patch = ticketPatchSchema.parse(req.body);
     res.json(await updateTicket(id.data, patch, adminActor(req)));
+  });
+
+  // Send (or resend) this booking's pass message
+  router.post('/:id/resend', async (req, res) => {
+    const id = z.string().uuid().safeParse(req.params.id);
+    if (!id.success) throw new HttpError(404, 'not_found', 'Booking not found');
+    res.status(202).json(await resendTicket(id.data, adminActor(req)));
   });
 
   return router;

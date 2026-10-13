@@ -28,6 +28,26 @@ const schema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
   ADMIN_SESSION_HOURS: z.coerce.number().int().min(1).max(168).default(12),
 
+  /** mock = log only; cloud = Meta WhatsApp Cloud API. */
+  MESSAGE_SENDER: z.enum(['mock', 'cloud']).default('mock'),
+  SEND_RATE_PER_SECOND: z.coerce.number().int().min(1).max(80).default(20),
+  /** First retry delay for temporary send errors; doubles each retry. */
+  SEND_RETRY_BASE_MS: z.coerce.number().int().min(1).default(2000),
+  /** Run the send worker inside the API process. Set false when running `npm run worker` separately. */
+  RUN_WORKER: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  /** Namespace for queue keys in Redis, so tests never touch real queues. */
+  QUEUE_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .default('tk'),
+
+  WA_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/, 'looks like v23.0')
+    .default('v23.0'),
   WA_PHONE_NUMBER_ID: z.string().optional(),
   WA_ACCESS_TOKEN: z.string().optional(),
   WA_APP_SECRET: z.string().optional(),

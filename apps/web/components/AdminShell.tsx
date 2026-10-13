@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/upload', label: 'Upload' },
   { href: '/admin/bookings', label: 'Bookings' },
+  { href: '/admin/send', label: 'Send' },
   { href: '/admin/settings', label: 'Settings' },
 ];
 

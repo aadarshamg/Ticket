@@ -92,6 +92,43 @@ export interface ConfirmResult {
   passesRemoved: number;
 }
 
+// --- Sending ---------------------------------------------------------------
+
+export interface SendStatus {
+  /** False when the server has no queue or WhatsApp settings. */
+  configured: boolean;
+  problem: string | null;
+  /** "mock" = test mode (messages are only logged); "cloud" = real WhatsApp. */
+  sender: string | null;
+  counts: { unsent: number; queued: number; sent: number; delivered: number; read: number; failed: number };
+  /** Bookings that still have unused passes. */
+  reminderCandidates: number;
+  queue: {
+    paused: boolean;
+    pauseReason: 'manual' | 'failure_rate' | null;
+    pausedAt: string | null;
+    startedAt: string | null;
+    /** The current (or last) run. */
+    total: number;
+    sent: number;
+    failed: number;
+    /** Messages still waiting in the queue. */
+    pending: number;
+  } | null;
+}
+
+export interface SendQueued {
+  batchId: string;
+  template: string;
+  queued: number;
+}
+
+export interface TestSendResult {
+  sender: string;
+  orderId: string;
+  results: { phone: string; ok: boolean; error: string | null }[];
+}
+
 // --- Bookings --------------------------------------------------------------
 
 export type MessageStatus = 'unsent' | 'queued' | 'sent' | 'delivered' | 'read' | 'failed';

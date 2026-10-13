@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Prisma, TicketStatus } from '@prisma/client';
 import type { Express } from 'express';
 import request from 'supertest';
@@ -109,6 +110,24 @@ export async function createTicket(options: TicketOptions) {
       },
     },
     include: { passes: true },
+  });
+}
+
+/** Creates `count` single-pass bookings in three statements (for tests that need many). */
+export async function createTickets(count: number, prefix = 'BULK') {
+  const anchor = await createTicket({ orderId: `${prefix}-0`, passCount: 1 });
+  const tickets = Array.from({ length: count - 1 }, (_, index) => ({
+    id: randomUUID(),
+    orderId: `${prefix}-${index + 1}`,
+    code: generateCode(),
+    name: `Guest ${prefix}-${index + 1}`,
+    phone: `+9197${String(10000000 + index).padStart(8, '0')}`,
+    passCount: 1,
+    uploadId: anchor.uploadId,
+  }));
+  await prisma.ticket.createMany({ data: tickets });
+  await prisma.pass.createMany({
+    data: tickets.map((ticket) => ({ ticketId: ticket.id, passNo: 1, code: generateCode() })),
   });
 }
 

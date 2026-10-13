@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev": "concurrently -n redis,api,web -c gray,blue,green \"npm run redis\" \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w apps/api && npm run build -w apps/web",
     "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
     "test": "npm run test -w apps/api",
@@ -18,7 +18,9 @@
     "db:migrate": "npm run db:migrate -w apps/api --",
     "db:deploy": "npm run db:deploy -w apps/api",
     "seed": "npm run seed -w apps/api --",
-    "create-admin": "npm run create-admin -w apps/api --"
+    "create-admin": "npm run create-admin -w apps/api --",
+    "redis": "node scripts/dev-redis.mjs",
+    "worker": "npm run worker -w apps/api"
   },
   "devDependencies": {
     "concurrently": "^9.2.5"
