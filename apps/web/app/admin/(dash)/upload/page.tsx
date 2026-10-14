@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Badge, type BadgeTone } from '@/components/Badge';
 import { api } from '@/lib/api';
+import { formatNight } from '@/lib/ist';
 import type { ConfirmResult, PreviewRow, UploadPreview } from '@/lib/types';
 
 type Filter = 'all' | 'valid' | 'invalid';
@@ -185,6 +186,7 @@ export default function UploadPage() {
                   ['amount', 'No', 'Number, in rupees.'],
                   ['category', 'No', 'Any text, such as General or VIP.'],
                   ['email', 'No', 'A valid email address.'],
+                  ['night', 'Multi-night events', 'The night the booking is for, e.g. 17/10/2026, 17 Oct or Sat, 17 Oct 2026 7:00 PM. A column called date or show_date also works.'],
                 ].map(([column, required, rule]) => (
                   <tr key={column}>
                     <td className="py-1.5 pr-4 font-mono text-xs">{column}</td>
@@ -279,6 +281,7 @@ export default function UploadPage() {
                 <th className="px-2 py-2">Passes</th>
                 <th className="px-2 py-2">Amount</th>
                 <th className="px-2 py-2">Category</th>
+                <th className="px-2 py-2">Night</th>
                 <th className="px-4 py-2">Email</th>
               </tr>
             </thead>
@@ -294,9 +297,10 @@ export default function UploadPage() {
                       String(row.data.passCount),
                       row.data.amount ?? '',
                       row.data.category ?? '',
+                      row.data.night ? formatNight(row.data.night) : '',
                       row.data.email ?? '',
                     ]
-                  : [row.raw.order_id, row.raw.name, row.raw.phone, row.raw.passes, row.raw.amount, row.raw.category, row.raw.email];
+                  : [row.raw.order_id, row.raw.name, row.raw.phone, row.raw.passes, row.raw.amount, row.raw.category, row.raw.night, row.raw.email];
                 return (
                   <tr key={row.row} className={row.valid ? '' : 'bg-red-50/40'}>
                     <td className="px-4 py-2 text-zinc-500">{row.row}</td>

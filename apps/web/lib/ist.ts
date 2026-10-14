@@ -51,6 +51,14 @@ export function formatIstDate(iso: string): string {
   return `${p.weekday}, ${p.day} ${p.month} ${p.year}`;
 }
 
+const nightFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+
+/** A booking's night, "2026-10-18" -> "Sun, 18 Oct" */
+export function formatNight(night: string): string {
+  const p = Object.fromEntries(nightFormat.formatToParts(new Date(`${night}T00:00:00Z`)).map((part) => [part.type, part.value]));
+  return `${p.weekday}, ${p.day} ${p.month}`;
+}
+
 /** 24-hour time, e.g. "18:00" */
 export function formatIstTime(iso: string): string {
   const p = parts(iso);

@@ -12,6 +12,7 @@ const row: RowData = {
   passCount: 2,
   amount: '1598.00',
   category: 'General',
+  night: null,
 };
 
 const existing: ExistingTicket = {
@@ -23,6 +24,7 @@ const existing: ExistingTicket = {
   passCount: 2,
   amount: new Prisma.Decimal('1598'),
   category: 'General',
+  night: null,
   status: 'active',
   passes: [
     { id: 'p1', passNo: 1, status: 'valid' },
@@ -85,6 +87,27 @@ describe('classifyRow', () => {
       ok: false,
       reason: 'cannot reduce to 2 passes: 3 already used',
     });
+  });
+
+  it('on a multi-night event, refuses a new booking without a night', () => {
+    const nights = ['2026-10-17', '2026-10-18'];
+    expect(classifyRow(row, undefined, all, nights)).toEqual({
+      ok: false,
+      reason: 'night is missing: add a night column (Sat, 17 Oct or Sun, 18 Oct)',
+    });
+    expect(classifyRow({ ...row, night: '2026-10-18' }, undefined, all, nights)).toMatchObject({ ok: true, action: 'create' });
+  });
+
+  it('changes the night when the column is present, and keeps it when absent', () => {
+    const withNight = new Set<ColumnName>([...all, 'night']);
+    const stored = { ...existing, night: new Date('2026-10-17T00:00:00Z') };
+    expect(classifyRow({ ...row, night: '2026-10-18' }, stored, withNight)).toMatchObject({
+      ok: true,
+      action: 'update',
+      changes: ['night'],
+      data: { night: '2026-10-18' },
+    });
+    expect(classifyRow(row, stored, all)).toMatchObject({ ok: true, action: 'unchanged', data: { night: '2026-10-17' } });
   });
 
   it('notes that a cancelled booking stays cancelled', () => {

@@ -32,6 +32,7 @@ enum CheckinResult {
   already_used
   invalid
   cancelled
+  wrong_night
 }
 
 enum UploadStatus {
@@ -84,6 +85,8 @@ model Ticket {
   passCount Int
   amount    Decimal?     @db.Decimal(10, 2)
   category  String?
+  /// India date of the night this booking is for, on a multi-night event. Null: any night.
+  night     DateTime?    @db.Date
   status    TicketStatus @default(active)
   uploadId  String       @db.Uuid
   upload    Upload       @relation(fields: [uploadId], references: [id])

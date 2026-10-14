@@ -1,6 +1,7 @@
 import type { Event, Pass, TicketStatus } from '@prisma/client';
 import { env } from '../config/env';
 import { prisma } from '../db';
+import { bookingTimes, nightFromDb } from '../lib/nights';
 import { signPass } from '../lib/qr';
 
 // What the public pass pages may see. Deliberately narrow: no phone, email, internal IDs,
@@ -14,15 +15,21 @@ export function parseCode(raw: string): string | null {
   return CODE.test(code) ? code : null;
 }
 
-function eventView(event: Event, over: boolean) {
+/**
+ * The event as one booking sees it. On a multi-night event the date and times are those of the
+ * booking's own night, and "over" means that night is over: its QR codes are no longer shown.
+ */
+function eventView(event: Event, night: Date | null) {
+  const times = bookingTimes(event, nightFromDb(night));
+  const over = Date.now() > times.endsAt.getTime();
   return {
     name: event.name,
     organiserName: event.organiserName,
     venue: event.venue,
     city: event.city,
-    startsAt: event.startsAt,
-    gatesOpenAt: event.gatesOpenAt,
-    endsAt: event.endsAt,
+    startsAt: times.startsAt,
+    gatesOpenAt: times.gatesOpenAt,
+    endsAt: times.endsAt,
     logoUrl: event.logoUrl,
     brandColour: event.brandColour,
     helplineNumber: event.helplineNumber,
@@ -55,6 +62,7 @@ export async function getBookingView(code: string) {
         orderId: true,
         name: true,
         category: true,
+        night: true,
         status: true,
         passCount: true,
         passes: {
@@ -66,9 +74,10 @@ export async function getBookingView(code: string) {
   ]);
   if (!event || !ticket) return null;
 
-  const over = Date.now() > event.endsAt.getTime();
+  const view = eventView(event, ticket.night);
+  const { over } = view;
   return {
-    event: eventView(event, over),
+    event: view,
     booking: {
       orderId: ticket.orderId,
       firstName: ticket.name.trim().split(/\s+/)[0] ?? '',
@@ -97,15 +106,16 @@ export async function getPassView(code: string) {
         status: true,
         usedAt: true,
         usedGate: true,
-        ticket: { select: { status: true, category: true, _count: { select: { passes: true } } } },
+        ticket: { select: { status: true, category: true, night: true, _count: { select: { passes: true } } } },
       },
     }),
   ]);
   if (!event || !pass) return null;
 
-  const over = Date.now() > event.endsAt.getTime();
+  const view = eventView(event, pass.ticket.night);
+  const { over } = view;
   return {
-    event: eventView(event, over),
+    event: view,
     pass: {
       ...passView(pass, pass.ticket.status, over),
       passCount: pass.ticket._count.passes,

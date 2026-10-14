@@ -6,7 +6,7 @@ import { InstallPrompt } from '@/components/scan/InstallPrompt';
 import { LookupPanel } from '@/components/scan/LookupPanel';
 import { api, ApiError, setCsrfToken } from '@/lib/api';
 import { primeAudio, signal, type Signal } from '@/lib/feedback';
-import { formatIstTime } from '@/lib/ist';
+import { formatIstTime, formatNight } from '@/lib/ist';
 import { registerServiceWorker, saveCurrentPage } from '@/lib/offline/precache';
 import {
   checkLocally,
@@ -86,6 +86,16 @@ function toView(outcome: ScanOutcome): ResultView {
       };
     case 'cancelled':
       return { tone: 'amber', title: 'Cancelled', lines: [...who, 'This booking was cancelled. Do not admit.'] };
+    case 'wrong_night':
+      return {
+        tone: 'red',
+        title: 'Wrong night',
+        lines: [
+          ...who,
+          booking?.night ? `This pass is for ${formatNight(booking.night)}` : 'This pass is for another night',
+          'Do not admit tonight.',
+        ],
+      };
     case 'invalid':
       return { tone: 'red', title: 'Invalid pass', lines: ['This is not a valid pass for this event.'] };
   }
@@ -110,7 +120,7 @@ function toLocalView(verdict: LocalVerdict): ResultView {
       return {
         tone: 'red',
         title: 'Not valid',
-        lines: ['Not on this phone’s list of valid passes.', 'It may be already used, cancelled or fake. Do not admit.'],
+        lines: ['Not on this phone’s list of valid passes.', 'It may be already used, cancelled, for another night or fake. Do not admit.'],
       };
     case 'no_list':
       return {
@@ -395,7 +405,16 @@ export default function ScanPage() {
               title: `Admitted ${outcome.admitted} more`,
               lines: [booking.name, `All ${outcome.booking.passCount} have entered`],
             }
-          : { tone: 'red', title: 'Nobody left to admit', lines: [booking.name, 'Everyone on this booking has already entered'] },
+          : outcome.wrongNight
+            ? {
+                tone: 'red',
+                title: 'Wrong night',
+                lines: [
+                  booking.name,
+                  outcome.booking.night ? `This booking is for ${formatNight(outcome.booking.night)}` : 'This booking is for another night',
+                ],
+              }
+            : { tone: 'red', title: 'Nobody left to admit', lines: [booking.name, 'Everyone on this booking has already entered'] },
       );
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) return endSession();

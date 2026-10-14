@@ -6,6 +6,7 @@ import { env } from '../../src/config/env';
 import { prisma } from '../../src/db';
 import { generateCode } from '../../src/lib/codes';
 import { hashPassword, hashPin } from '../../src/lib/passwords';
+import { invalidateEventCache } from '../../src/services/eventCache';
 import { invalidateGateCache } from '../../src/services/gates';
 
 const TABLES = ['AuditLog', 'Checkin', 'Message', 'Pass', 'Ticket', 'Upload', 'AdminUser', 'Gate', 'Event'];
@@ -21,6 +22,7 @@ export async function resetDb(): Promise<void> {
   const tables = TABLES.map((table) => `"${env.DB_SCHEMA}"."${table}"`).join(', ');
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`);
   invalidateGateCache();
+  invalidateEventCache();
 }
 
 let cachedHash: string | undefined;
@@ -42,6 +44,7 @@ export async function signIn(app: Express, email = ADMIN_EMAIL, password = ADMIN
 }
 
 export async function createEvent(overrides: Partial<Prisma.EventCreateInput> = {}) {
+  invalidateEventCache();
   return prisma.event.create({
     data: {
       id: 1,
@@ -65,6 +68,8 @@ interface TicketOptions {
   phone?: string;
   email?: string | null;
   status?: TicketStatus;
+  /** The night the booking is for ("2026-10-17"). */
+  night?: string;
   /** Pass numbers that have already been used at the gate. */
   used?: number[];
 }
@@ -96,6 +101,7 @@ export async function createTicket(options: TicketOptions) {
       phone: options.phone ?? `+9198${String(10000000 + ticketSeq++).padStart(8, '0')}`,
       email: options.email ?? null,
       passCount: options.passCount,
+      night: options.night ? new Date(`${options.night}T00:00:00Z`) : null,
       status,
       uploadId: upload.id,
       passes: {

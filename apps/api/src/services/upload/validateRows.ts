@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nightLabel, parseNight } from '../../lib/nights';
 import { normalisePhone } from '../../lib/phone';
 import { COLUMNS, type ColumnName, type SheetRow } from './parseSheet';
 
@@ -11,6 +12,8 @@ export interface RowData {
   passCount: number;
   amount: string | null;
   category: string | null;
+  /** India date of the booking's night ("2026-10-17"); null when the row gives none. */
+  night: string | null;
 }
 
 export interface ValidatedRow {
@@ -46,8 +49,12 @@ function parseAmount(value: unknown): number | null {
   return /^\d+(\.\d+)?$/.test(text) ? Number(text) : null;
 }
 
-/** Checks every row against the column rules. Pure: no database access. */
-export function validateRows(rows: SheetRow[], maxPassesPerBooking: number): ValidatedRow[] {
+/**
+ * Checks every row against the column rules. Pure: no database access.
+ * `nights` are the event's nights; on a multi-night event every row that has the night column
+ * must name one of them.
+ */
+export function validateRows(rows: SheetRow[], maxPassesPerBooking: number, nights: string[] = []): ValidatedRow[] {
   const results = rows.map(({ row, cells }): ValidatedRow => {
     const raw = Object.fromEntries(COLUMNS.map((column) => [column, cellText(cells[column])])) as Record<
       ColumnName,
@@ -92,9 +99,18 @@ export function validateRows(rows: SheetRow[], maxPassesPerBooking: number): Val
     const email = raw.email ? raw.email.toLowerCase() : null;
     if (email && !emailSchema.safeParse(email).success) error('email is not valid');
 
+    let night: string | null = null;
+    if (raw.night) {
+      const parsed = parseNight(cells.night, nights);
+      if ('error' in parsed) error(parsed.error);
+      else night = parsed.night;
+    } else if ('night' in cells && nights.length > 1) {
+      error(`night is missing (${nights.map(nightLabel).join(' or ')})`);
+    }
+
     const data: RowData | null =
       errors.length === 0 && phone.ok
-        ? { orderId, name, phone: phone.value, email, passCount, amount, category }
+        ? { orderId, name, phone: phone.value, email, passCount, amount, category, night }
         : null;
     return { row, raw, errors, data };
   });

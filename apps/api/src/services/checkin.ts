@@ -1,9 +1,11 @@
-import type { CheckinResult, PassStatus, Prisma, TicketStatus } from '@prisma/client';
+import { Prisma, type CheckinResult, type PassStatus, type TicketStatus } from '@prisma/client';
 import { prisma, TX_OPTIONS } from '../db';
+import { nightFromDb } from '../lib/nights';
 import { verifyQr } from '../lib/qr';
 import type { GateSession } from '../lib/session';
 import { table } from '../lib/sql';
 import { HttpError } from '../middleware/errors';
+import { tonight } from './eventCache';
 
 /**
  * What the scanner shows. Volunteers get the name, category and pass counts only:
@@ -15,6 +17,8 @@ export interface ScanOutcome {
     ticketId: string;
     name: string;
     category: string | null;
+    /** The night the booking is for ("2026-10-18"), on a multi-night event. */
+    night: string | null;
     passCount: number;
     /** Valid passes still to be used after this scan. */
     remaining: number;
@@ -34,6 +38,7 @@ interface PassInfo {
   ticketId: string;
   name: string;
   category: string | null;
+  night: Date | null;
   ticketStatus: TicketStatus;
   passCount: number;
   remaining: number;
@@ -43,7 +48,7 @@ interface PassInfo {
 async function loadPassInfo(passId: string): Promise<PassInfo | null> {
   const rows = await prisma.$queryRaw<PassInfo[]>`
     SELECT p."passNo", p."status", p."usedAt", p."usedGate",
-           t."id" AS "ticketId", t."name", t."category", t."status" AS "ticketStatus",
+           t."id" AS "ticketId", t."name", t."category", t."night", t."status" AS "ticketStatus",
            (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id") AS "passCount",
            (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id" AND x."status" = 'valid') AS "remaining"
     FROM ${table('Pass')} p
@@ -58,11 +63,27 @@ function describe(info: PassInfo): Pick<ScanOutcome, 'booking' | 'pass'> {
       ticketId: info.ticketId,
       name: info.name,
       category: info.category,
+      night: nightFromDb(info.night),
       passCount: info.passCount,
       remaining: info.remaining,
     },
     pass: { passNo: info.passNo, usedAt: info.usedAt, usedGate: info.usedGate },
   };
+}
+
+/** True when a booking is for a different night than the one being checked in. */
+function isWrongNight(bookingNight: Date | null, night: string | null): boolean {
+  return night !== null && bookingNight !== null && nightFromDb(bookingNight) !== night;
+}
+
+/**
+ * SQL condition: the pass's booking may come in on `night` (it is for that night, or for any
+ * night). Always true when `night` is null, i.e. on a day that is not one of the event's nights.
+ */
+function forNight(night: string | null) {
+  return Prisma.sql`(${night}::date IS NULL OR EXISTS (
+    SELECT 1 FROM ${table('Ticket')} nt
+    WHERE nt."id" = ${table('Pass')}."ticketId" AND (nt."night" IS NULL OR nt."night" = ${night}::date)))`;
 }
 
 /** Every scan attempt is logged, whatever its result. `passId` is null when the QR matched no pass. */
@@ -110,6 +131,7 @@ interface AdmittedRow {
   ticketId: string;
   name: string;
   category: string | null;
+  night: Date | null;
   passCount: number;
   /** Valid passes on the booking just before this scan (the statement sees its starting snapshot). */
   validBefore: number;
@@ -122,12 +144,17 @@ interface AdmittedRow {
  * it is still valid), write the scan log and the audit entry, and read what the volunteer sees.
  * Returns null if the pass was not valid, leaving the caller to work out why.
  */
-async function admitInOneTrip(passId: string, session: GateSession, clientRef?: string): Promise<ScanOutcome | null> {
+async function admitInOneTrip(
+  passId: string,
+  session: GateSession,
+  night: string | null,
+  clientRef?: string,
+): Promise<ScanOutcome | null> {
   const rows = await prisma.$queryRaw<AdmittedRow[]>`
     WITH upd AS (
       UPDATE ${table('Pass')}
       SET "status" = 'used', "usedAt" = now(), "usedGate" = ${session.gate}
-      WHERE "id" = ${passId}::uuid AND "status" = 'valid'
+      WHERE "id" = ${passId}::uuid AND "status" = 'valid' AND ${forNight(night)}
       RETURNING "id", "ticketId", "passNo", "usedAt"
     ),
     logged AS (
@@ -143,7 +170,7 @@ async function admitInOneTrip(passId: string, session: GateSession, clientRef?: 
       FROM upd
       RETURNING 1
     )
-    SELECT upd."passNo", upd."usedAt", t."id" AS "ticketId", t."name", t."category",
+    SELECT upd."passNo", upd."usedAt", t."id" AS "ticketId", t."name", t."category", t."night",
            (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id") AS "passCount",
            (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id" AND x."status" = 'valid') AS "validBefore",
            (SELECT count(*)::int FROM logged) AS "logged"
@@ -160,6 +187,7 @@ async function admitInOneTrip(passId: string, session: GateSession, clientRef?: 
       ticketId: row.ticketId,
       name: row.name,
       category: row.category,
+      night: nightFromDb(row.night),
       passCount: row.passCount,
       remaining: Math.max(0, row.validBefore - 1),
     },
@@ -186,7 +214,8 @@ export async function scanPass(qr: unknown, session: GateSession, clientRef?: st
     return { result: 'invalid' };
   }
 
-  const admitted = await admitInOneTrip(passId, session, clientRef);
+  const night = await tonight();
+  const admitted = await admitInOneTrip(passId, session, night, clientRef);
   if (admitted) return admitted;
 
   // Nothing was updated: find out why, for the volunteer's screen. (The uncommon path.)
@@ -202,7 +231,12 @@ export async function scanPass(qr: unknown, session: GateSession, clientRef?: st
     const mine = await prisma.checkin.findUnique({ where: { clientRef }, select: { passId: true, result: true } });
     if (mine?.result === 'ok' && mine.passId === passId) return { result: 'ok', ...describe(info) };
   }
-  const result: CheckinResult = info.status === 'cancelled' ? 'cancelled' : 'already_used';
+  const result: CheckinResult =
+    info.status === 'cancelled'
+      ? 'cancelled'
+      : info.status === 'valid' && isWrongNight(info.night, night)
+        ? 'wrong_night'
+        : 'already_used';
   await logCheckins(prisma, session, [passId], result, clientRef);
   return { result, ...describe(info) };
 }
@@ -210,15 +244,17 @@ export async function scanPass(qr: unknown, session: GateSession, clientRef?: st
 async function bookingSummary(ticketId: string) {
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
-    select: { id: true, name: true, category: true, status: true, passes: { select: { status: true } } },
+    select: { id: true, name: true, category: true, night: true, status: true, passes: { select: { status: true } } },
   });
   if (!ticket) throw new HttpError(404, 'not_found', 'Booking not found');
   return {
     status: ticket.status,
+    night: ticket.night,
     booking: {
       ticketId: ticket.id,
       name: ticket.name,
       category: ticket.category,
+      night: nightFromDb(ticket.night),
       passCount: ticket.passes.length,
       remaining: ticket.passes.filter((pass) => pass.status === 'valid').length,
     },
@@ -227,11 +263,12 @@ async function bookingSummary(ticketId: string) {
 
 /** Admits everyone still to come on a booking: all of its valid passes, in one transaction. */
 export async function admitAllRemaining(ticketId: string, session: GateSession) {
+  const night = await tonight();
   const admitted = await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       UPDATE ${table('Pass')}
       SET "status" = 'used', "usedAt" = now(), "usedGate" = ${session.gate}
-      WHERE "ticketId" = ${ticketId}::uuid AND "status" = 'valid'
+      WHERE "ticketId" = ${ticketId}::uuid AND "status" = 'valid' AND ${forNight(night)}
       RETURNING "id"`;
     if (rows.length > 0) {
       await logCheckins(tx, session, rows.map((row) => row.id), 'ok');
@@ -241,11 +278,17 @@ export async function admitAllRemaining(ticketId: string, session: GateSession) 
   }, TX_OPTIONS);
 
   const summary = await bookingSummary(ticketId);
-  return { admitted, cancelled: summary.status === 'cancelled', booking: summary.booking };
+  return {
+    admitted,
+    cancelled: summary.status === 'cancelled',
+    wrongNight: admitted === 0 && isWrongNight(summary.night, night),
+    booking: summary.booking,
+  };
 }
 
 /** Manual entry: admits one person on a booking (its lowest-numbered valid pass). */
 export async function admitOne(ticketId: string, session: GateSession): Promise<ScanOutcome> {
+  const night = await tonight();
   // SKIP LOCKED: two volunteers pressing "Admit 1" on the same booking at once admit two
   // different passes, never the same one twice.
   const rows = await prisma.$queryRaw<{ id: string; passNo: number; usedAt: Date }[]>`
@@ -253,7 +296,7 @@ export async function admitOne(ticketId: string, session: GateSession): Promise<
     SET "status" = 'used', "usedAt" = now(), "usedGate" = ${session.gate}
     WHERE "id" = (
       SELECT "id" FROM ${table('Pass')}
-      WHERE "ticketId" = ${ticketId}::uuid AND "status" = 'valid'
+      WHERE "ticketId" = ${ticketId}::uuid AND "status" = 'valid' AND ${forNight(night)}
       ORDER BY "passNo"
       LIMIT 1
       FOR UPDATE SKIP LOCKED
@@ -275,7 +318,13 @@ export async function admitOne(ticketId: string, session: GateSession): Promise<
       pass: { passNo: admitted.passNo, usedAt: admitted.usedAt, usedGate: session.gate },
     };
   }
-  return { result: summary.status === 'cancelled' ? 'cancelled' : 'already_used', booking: summary.booking };
+  const result: CheckinResult =
+    summary.status === 'cancelled'
+      ? 'cancelled'
+      : summary.booking.remaining > 0 && isWrongNight(summary.night, night)
+        ? 'wrong_night'
+        : 'already_used';
+  return { result, booking: summary.booking };
 }
 
 /**
@@ -288,17 +337,23 @@ export async function lookupBookings(query: string) {
     ? { OR: [{ phone: { endsWith: q } }, { orderId: { equals: q, mode: 'insensitive' } }] }
     : { orderId: { equals: q, mode: 'insensitive' } };
 
-  const tickets = await prisma.ticket.findMany({
-    where,
-    select: { id: true, name: true, category: true, status: true, passes: { select: { status: true } } },
-    orderBy: { orderId: 'asc' },
-    take: 10,
-  });
+  const [tickets, night] = await Promise.all([
+    prisma.ticket.findMany({
+      where,
+      select: { id: true, name: true, category: true, night: true, status: true, passes: { select: { status: true } } },
+      orderBy: { orderId: 'asc' },
+      take: 10,
+    }),
+    tonight(),
+  ]);
   return {
     results: tickets.map((ticket) => ({
       ticketId: ticket.id,
       name: ticket.name,
       category: ticket.category,
+      night: nightFromDb(ticket.night),
+      /** For another night than tonight's: the volunteer must not let them in. */
+      wrongNight: isWrongNight(ticket.night, night),
       cancelled: ticket.status === 'cancelled',
       passCount: ticket.passes.length,
       entered: ticket.passes.filter((pass) => pass.status === 'used').length,

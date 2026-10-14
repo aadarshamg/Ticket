@@ -3,9 +3,17 @@ import * as XLSX from 'xlsx';
 import { MAX_UPLOAD_ROWS } from '../../config/constants';
 import { HttpError } from '../../middleware/errors';
 
-export const COLUMNS = ['order_id', 'name', 'phone', 'passes', 'amount', 'category', 'email'] as const;
+export const COLUMNS = ['order_id', 'name', 'phone', 'passes', 'amount', 'category', 'email', 'night'] as const;
 export type ColumnName = (typeof COLUMNS)[number];
 export const REQUIRED_COLUMNS: readonly ColumnName[] = ['order_id', 'name', 'phone', 'passes'];
+
+/** Other headings booking exports use for the same columns. */
+const ALIASES: Record<string, ColumnName> = {
+  date: 'night',
+  event_date: 'night',
+  show_date: 'night',
+  show_day: 'night',
+};
 
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 
@@ -85,7 +93,8 @@ export function parseSheet(buffer: Buffer, fileName: string): ParsedSheet {
   const columnIndex = new Map<ColumnName, number>();
   const ignoredColumns: string[] = [];
   headerCells.forEach((cell, index) => {
-    const header = normaliseHeader(cell);
+    const normalised = normaliseHeader(cell);
+    const header = ALIASES[normalised] ?? normalised;
     if (!header) return;
     if (!(COLUMNS as readonly string[]).includes(header)) {
       ignoredColumns.push(String(cell).trim());
@@ -101,7 +110,7 @@ export function parseSheet(buffer: Buffer, fileName: string): ParsedSheet {
     throw badFile(
       `Missing required column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}. ` +
         'The first row must contain the column names order_id, name, phone, passes ' +
-        '(amount, category and email are optional).',
+        '(amount, category, email and night are optional).',
     );
   }
 

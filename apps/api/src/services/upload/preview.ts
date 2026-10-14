@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient, Upload } from '@prisma/client';
 import { UPLOAD_PREVIEW_TTL_MS } from '../../config/constants';
 import { prisma, TX_OPTIONS } from '../../db';
 import { audit, type Actor } from '../../lib/audit';
+import { eventNights } from '../../lib/nights';
 import { HttpError } from '../../middleware/errors';
 import { classifyRow, existingTicketSelect, type ExistingTicket, type RowAction } from './classify';
 import { parseSheet, type ColumnName } from './parseSheet';
@@ -72,14 +73,18 @@ function toResponse(upload: Upload, preview: StoredPreview | null) {
  */
 export async function createPreview(file: { buffer: Buffer; originalname: string }, actor: Actor) {
   if (!actor.id) throw new HttpError(401, 'unauthenticated', 'Please sign in');
-  const event = await prisma.event.findUnique({ where: { id: 1 }, select: { maxPassesPerBooking: true } });
+  const event = await prisma.event.findUnique({
+    where: { id: 1 },
+    select: { maxPassesPerBooking: true, startsAt: true, gatesOpenAt: true, endsAt: true },
+  });
   if (!event) {
     throw new HttpError(409, 'event_not_configured', 'Set up the event in Settings before uploading bookings.');
   }
+  const nights = eventNights(event);
 
   const fileName = path.basename(file.originalname).slice(0, 200) || 'upload';
   const sheet = parseSheet(file.buffer, fileName);
-  const validated = validateRows(sheet.rows, event.maxPassesPerBooking);
+  const validated = validateRows(sheet.rows, event.maxPassesPerBooking, nights);
 
   const orderIds = validated.flatMap((row) => (row.data ? [row.data.orderId] : []));
   const existing = await loadExistingTickets(prisma, orderIds);
@@ -97,7 +102,7 @@ export async function createPreview(file: { buffer: Buffer; originalname: string
       data: null,
     });
     if (!row.data) return invalid(row.errors);
-    const result = classifyRow(row.data, existing.get(row.data.orderId), presentColumns);
+    const result = classifyRow(row.data, existing.get(row.data.orderId), presentColumns, nights);
     if (!result.ok) return invalid([`Row ${row.row}: ${result.reason}`]);
     return {
       row: row.row,

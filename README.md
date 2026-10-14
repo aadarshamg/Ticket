@@ -84,6 +84,16 @@ up to 5 MB / 10,000 rows). A sample is at `/sample-bookings.csv`.
 | `amount` | no | Number (INR) |
 | `category` | no | Free text |
 | `email` | no | Valid email |
+| `night` | on a multi-night event | The night the booking is for: `17/10/2026` (day first), `2026-10-17`, `17 Oct`, `Sat, 17 Oct 2026 7:00 PM`, an Excel date, `17` or `Night 1`. A column named `date`, `event_date` or `show_date` is read the same way. |
+
+**Events over several nights.** In Settings, give the first night's gate and start times and the
+last night's end time; every night in between runs at the same times (Settings lists the nights).
+Each booking is then for one night: its WhatsApp message and pass page show that night's date,
+its QR codes disappear after that night ends, and the scanner answers **Wrong night** (red) for
+it on any other night, including for admit-all, manual lookup and the offline list. A booking
+without a night is valid on any one night. The night a scan counts for is the India date until
+06:00 the next morning. On days that are not event nights (for example a rehearsal the day
+before) passes are not checked by night.
 
 1. **Check file** parses the file and shows every row as new, update, unchanged or invalid, with
    the exact reason (for example `Row 214: phone has 9 digits`). No booking is touched.

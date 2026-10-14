@@ -1,5 +1,6 @@
 import type { Event, Prisma } from '@prisma/client';
 import { TICKET_TEMPLATE } from '../config/constants';
+import { bookingTimes, nightFromDb } from '../lib/nights';
 import { formatIstDate, formatIstTime } from '../lib/time';
 import type { OutboundMessage } from './types';
 
@@ -13,6 +14,13 @@ export interface MessageTicket {
   code: string;
   passCount: number;
   amount: Prisma.Decimal | null;
+  /** The booking's night on a multi-night event; its date and times go into the message. */
+  night?: Date | null;
+}
+
+/** The date and times this booking's message should give: its own night's, or the event's. */
+function timesFor(event: Event, ticket: MessageTicket) {
+  return bookingTimes(event, nightFromDb(ticket.night));
 }
 
 /** WhatsApp rejects template values containing new lines, tabs or runs of more than four spaces. */
@@ -32,6 +40,7 @@ export function formatAmount(amount: Prisma.Decimal | null): string {
  * 6 number of passes · 7 amount · 8 order ID · 9 organiser name
  */
 export function buildTicketMessage(event: Event, ticket: MessageTicket): OutboundMessage {
+  const times = timesFor(event, ticket);
   return {
     to: ticket.phone,
     template: TICKET_TEMPLATE,
@@ -39,8 +48,8 @@ export function buildTicketMessage(event: Event, ticket: MessageTicket): Outboun
     bodyParams: [
       ticket.name,
       event.name,
-      formatIstDate(event.startsAt),
-      formatIstTime(event.startsAt),
+      formatIstDate(times.startsAt),
+      formatIstTime(times.startsAt),
       `${event.venue}, ${event.city}`,
       String(ticket.passCount),
       formatAmount(ticket.amount),
@@ -57,6 +66,7 @@ export function buildTicketMessage(event: Event, ticket: MessageTicket): Outboun
  * 6 gates-open time (24h) · 7 passes not yet used · 8 organiser name
  */
 export function buildReminderMessage(event: Event, ticket: MessageTicket, unusedPasses: number): OutboundMessage {
+  const times = timesFor(event, ticket);
   return {
     to: ticket.phone,
     template: REMINDER_TEMPLATE,
@@ -64,10 +74,10 @@ export function buildReminderMessage(event: Event, ticket: MessageTicket, unused
     bodyParams: [
       ticket.name,
       event.name,
-      formatIstDate(event.startsAt),
-      formatIstTime(event.startsAt),
+      formatIstDate(times.startsAt),
+      formatIstTime(times.startsAt),
       `${event.venue}, ${event.city}`,
-      formatIstTime(event.gatesOpenAt),
+      formatIstTime(times.gatesOpenAt),
       String(unusedPasses),
       event.organiserName,
     ].map(cleanParam),

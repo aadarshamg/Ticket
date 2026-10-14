@@ -101,7 +101,7 @@ describe('POST /api/scan', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       result: 'ok',
-      booking: { ticketId: ticket.id, name: 'Asha Rao', category: null, passCount: 4, remaining: 2 },
+      booking: { ticketId: ticket.id, name: 'Asha Rao', category: null, night: null, passCount: 4, remaining: 2 },
       pass: { passNo: 2, usedAt: expect.any(String), usedGate: 'Gate A' },
     });
     const body = JSON.stringify(res.body);
@@ -261,7 +261,8 @@ describe('POST /api/scan/admit-all', () => {
     expect(res.body).toEqual({
       admitted: 3,
       cancelled: false,
-      booking: { ticketId: ticket.id, name: 'Asha Rao', category: null, passCount: 4, remaining: 0 },
+      wrongNight: false,
+      booking: { ticketId: ticket.id, name: 'Asha Rao', category: null, night: null, passCount: 4, remaining: 0 },
     });
 
     const passes = await prisma.pass.findMany({ where: { ticketId: ticket.id }, orderBy: { passNo: 'asc' } });
@@ -319,7 +320,7 @@ describe('manual lookup', () => {
     expect(byOrder.status).toBe(200);
     expect(byOrder.body).toEqual({
       results: [
-        { ticketId: asha.id, name: 'Asha Rao', category: null, cancelled: false, passCount: 3, entered: 1, remaining: 2 },
+        { ticketId: asha.id, name: 'Asha Rao', category: null, night: null, wrongNight: false, cancelled: false, passCount: 3, entered: 1, remaining: 2 },
       ],
     });
     const body = JSON.stringify(byOrder.body);

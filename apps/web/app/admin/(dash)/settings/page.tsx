@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [nights, setNights] = useState<SettingsResponse['nights']>([]);
   const nextKey = useRef(0);
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function SettingsPage() {
       .then((settings) => {
         setForm(toForm(settings));
         setGates(toGateRows(settings));
+        setNights(settings.nights);
       })
       .catch((err: unknown) =>
         setBanner({ kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong' }),
@@ -122,6 +124,7 @@ export default function SettingsPage() {
       });
       setForm(toForm(saved));
       setGates(toGateRows(saved));
+      setNights(saved.nights);
       setBanner({ kind: 'ok', text: 'Settings saved.' });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -190,7 +193,10 @@ export default function SettingsPage() {
       <section className="card space-y-4">
         <div>
           <h2 className="font-semibold">Timing</h2>
-          <p className="text-sm text-zinc-500">India Standard Time (IST).</p>
+          <p className="text-sm text-zinc-500">
+            India Standard Time (IST). For an event over several nights, give the first night&apos;s gate and start
+            times and the last night&apos;s end: every night runs at the same times.
+          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Gates open" htmlFor="gatesOpenAt" error={errors.gatesOpenAt}>
@@ -202,11 +208,18 @@ export default function SettingsPage() {
               value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} />
           </Field>
           <Field label="Event ends" htmlFor="endsAt" error={errors.endsAt}
-            hint="Passes stop showing QR codes after this.">
+            hint="Passes stop showing QR codes after this (on a multi-night event, after their own night).">
             <input id="endsAt" type="datetime-local" className={inputClass('endsAt')}
               value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} />
           </Field>
         </div>
+        {nights.length > 1 && (
+          <p className="rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+            <span className="font-medium text-zinc-900">{nights.length} nights:</span>{' '}
+            {nights.map((night) => night.label).join(', ')}. Each booking is for one night (the night column in the
+            upload), and the scanner turns a pass away on any other night.
+          </p>
+        )}
       </section>
 
       <section className="card space-y-4">

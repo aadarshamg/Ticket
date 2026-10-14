@@ -1,17 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma, type CheckinResult } from '@prisma/client';
 import { prisma } from '../db';
+import { nightToDb } from '../lib/nights';
 import { hashQr, signList } from '../lib/offlineList';
 import { signPass, verifyQr } from '../lib/qr';
 import type { GateSession } from '../lib/session';
+import { tonight } from './eventCache';
 
 /**
  * The list a scanner keeps for working without a connection: one short hash per pass that
- * is valid right now, signed so the phone can tell it is genuine and complete.
+ * is valid right now, signed so the phone can tell it is genuine and complete. On a night of a
+ * multi-night event, only that night's passes (and those valid on any night) are on it.
  */
 export async function buildOfflineList() {
+  const night = await tonight();
   const passes = await prisma.pass.findMany({
-    where: { status: 'valid', ticket: { status: 'active' } },
+    where: {
+      status: 'valid',
+      ticket: { status: 'active', ...(night ? { OR: [{ night: null }, { night: nightToDb(night) }] } : {}) },
+    },
     select: { id: true },
   });
   const hashes = passes.map((pass) => hashQr(signPass(pass.id))).sort();

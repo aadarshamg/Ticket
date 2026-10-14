@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { TICKET_TEMPLATE } from '../config/constants';
 import { prisma } from '../db';
 import { audit, type Actor } from '../lib/audit';
+import { eventNights, nightTimes, nightToDb, type EventTimes } from '../lib/nights';
 import { normalisePhone } from '../lib/phone';
 import { getMessaging, getMessagingIfConfigured, getSender } from '../messaging';
 import { buildTicketMessage, REMINDER_TEMPLATE } from '../messaging/templates';
@@ -26,8 +27,11 @@ export interface SendRequest {
 /** Arbitrary constant; stops two simultaneous "send" clicks from queueing the same booking twice. */
 const SEND_LOCK = Prisma.raw('7426002');
 
-function selection(request: SendRequest, template: string): Prisma.TicketWhereInput {
+function selection(request: SendRequest, template: string, pastNights: Date[]): Prisma.TicketWhereInput {
   const notAlreadyQueued: Prisma.TicketWhereInput = { messages: { none: { template, status: 'queued' } } };
+  // No reminders for a night that is already over.
+  const nightNotOver: Prisma.TicketWhereInput =
+    pastNights.length > 0 ? { OR: [{ night: null }, { night: { notIn: pastNights } }] } : {};
   switch (request.mode) {
     case 'unsent':
       return { status: 'active', messages: { none: { template } } };
@@ -36,8 +40,15 @@ function selection(request: SendRequest, template: string): Prisma.TicketWhereIn
     case 'selected':
       return { status: 'active', id: { in: request.ticketIds ?? [] }, ...notAlreadyQueued };
     case 'reminder':
-      return { status: 'active', passes: { some: { status: 'valid' } }, ...notAlreadyQueued };
+      return { status: 'active', passes: { some: { status: 'valid' } }, ...notAlreadyQueued, ...nightNotOver };
   }
+}
+
+/** Nights of the event whose end has passed, as stored in Ticket.night. */
+function pastNightsOf(event: EventTimes): Date[] {
+  return eventNights(event)
+    .filter((night) => nightTimes(event, night).endsAt.getTime() < Date.now())
+    .map((night) => nightToDb(night) as Date);
 }
 
 /** Marks the chosen bookings' messages as queued and hands them to the send queue. */
@@ -49,7 +60,7 @@ export async function queueSend(request: SendRequest, actor: Actor) {
     throw new HttpError(503, 'queue_unavailable', 'The send queue (Redis) cannot be reached. Nothing was queued.');
   }
 
-  const event = await prisma.event.findUnique({ where: { id: 1 }, select: { endsAt: true } });
+  const event = await prisma.event.findUnique({ where: { id: 1 }, select: { startsAt: true, gatesOpenAt: true, endsAt: true } });
   if (!event) throw new HttpError(409, 'event_not_configured', 'Set up the event in Settings before sending.');
   if (Date.now() > event.endsAt.getTime()) throw new HttpError(409, 'event_over', 'The event is over.');
 
@@ -58,13 +69,14 @@ export async function queueSend(request: SendRequest, actor: Actor) {
     throw new HttpError(409, 'template_not_configured', `WhatsApp is not set up for the ${template} message yet. Nothing was queued.`);
   }
   const batchId = randomUUID();
+  const pastNights = pastNightsOf(event);
 
   const messageIds = await prisma.$transaction(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SEND_LOCK})`;
 
       const tickets = await tx.ticket.findMany({
-        where: selection(request, template),
+        where: selection(request, template, pastNights),
         select: { id: true },
         orderBy: [{ createdAt: 'asc' }, { orderId: 'asc' }],
         take: request.limit,

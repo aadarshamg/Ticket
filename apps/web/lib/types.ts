@@ -37,11 +37,13 @@ export interface Gate {
 export interface SettingsResponse {
   event: EventSettings | null;
   gates: Gate[];
+  /** The event's nights ("2026-10-17"), first to last; more than one for a multi-night event. */
+  nights: { date: string; label: string }[];
 }
 
 // --- Uploads ---------------------------------------------------------------
 
-export type SheetColumn = 'order_id' | 'name' | 'phone' | 'passes' | 'amount' | 'category' | 'email';
+export type SheetColumn = 'order_id' | 'name' | 'phone' | 'passes' | 'amount' | 'category' | 'email' | 'night';
 export type RowAction = 'create' | 'update' | 'unchanged';
 
 export interface PreviewRow {
@@ -64,6 +66,7 @@ export interface PreviewRow {
     passCount: number;
     amount: string | null;
     category: string | null;
+    night: string | null;
   } | null;
 }
 
@@ -137,13 +140,15 @@ export interface GateSessionInfo {
   csrfToken: string;
 }
 
-export type ScanResultKind = 'ok' | 'already_used' | 'invalid' | 'cancelled';
+export type ScanResultKind = 'ok' | 'already_used' | 'invalid' | 'cancelled' | 'wrong_night';
 
 /** All a volunteer is shown about a booking: no phone, email or order ID. */
 export interface ScanBooking {
   ticketId: string;
   name: string;
   category: string | null;
+  /** The night the booking is for ("2026-10-18"), on a multi-night event. */
+  night: string | null;
   passCount: number;
   /** Passes still valid (people still to come). */
   remaining: number;
@@ -158,6 +163,8 @@ export interface ScanOutcome {
 export interface AdmitAllOutcome {
   admitted: number;
   cancelled: boolean;
+  /** Nobody was admitted because the booking is for another night. */
+  wrongNight: boolean;
   booking: ScanBooking;
 }
 
@@ -165,6 +172,9 @@ export interface LookupResult {
   ticketId: string;
   name: string;
   category: string | null;
+  night: string | null;
+  /** For another night than tonight's: do not admit. */
+  wrongNight: boolean;
   cancelled: boolean;
   passCount: number;
   entered: number;
@@ -194,6 +204,10 @@ export interface Stats {
   entered: number;
   stillToCome: number;
   gates: { gate: string; entered: number; lastEntryAt: string | null }[];
+  /** Entry per night; empty unless the event has more than one night. */
+  nights: { night: string | null; label: string; entered: number; expected: number }[];
+  /** The night being checked in now, or null. */
+  tonight: string | null;
   conflicts: number;
 }
 
@@ -232,6 +246,7 @@ export interface Booking {
   usedCount: number;
   amount: string | null;
   category: string | null;
+  night: string | null;
   status: BookingStatus;
   messageStatus: MessageStatus;
   messageError: string | null;

@@ -125,7 +125,7 @@ describe('GET /api/export.csv', () => {
 
     const [header, ...rows] = parseCsv(res.text);
     expect(header).toEqual([
-      'order_id', 'name', 'phone', 'email', 'category', 'amount', 'passes', 'passes_used', 'passes_remaining',
+      'order_id', 'name', 'phone', 'email', 'category', 'night', 'amount', 'passes', 'passes_used', 'passes_remaining',
       'booking_status', 'message_status', 'message_error', 'first_entry_ist', 'last_entry_ist', 'gates',
     ]);
     expect(rows).toHaveLength(3);

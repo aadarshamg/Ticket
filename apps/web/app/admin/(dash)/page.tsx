@@ -173,6 +173,30 @@ export default function OverviewPage() {
             )}
           </section>
 
+          {stats.nights.length > 0 && (
+            <section aria-label="By night">
+              <h2 className="mb-2 font-semibold">By night</h2>
+              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {stats.nights.map((night) => (
+                  <div key={night.night ?? 'any'} className="card p-3 sm:p-4">
+                    <dt className="flex items-center gap-2 text-xs text-zinc-500">
+                      {night.label}
+                      {night.night !== null && night.night === stats.tonight && (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+                          Tonight
+                        </span>
+                      )}
+                    </dt>
+                    <dd className="text-2xl font-semibold">
+                      {n(night.entered)}
+                      <span className="text-sm font-normal text-zinc-500"> of {n(night.expected)} entered</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
           <section aria-label="Bookings and passes">
             <h2 className="mb-2 font-semibold">Bookings and passes</h2>
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">

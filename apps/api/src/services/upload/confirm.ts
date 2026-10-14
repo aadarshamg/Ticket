@@ -4,6 +4,7 @@ import { UPLOAD_PREVIEW_TTL_MS } from '../../config/constants';
 import { prisma } from '../../db';
 import type { Actor } from '../../lib/audit';
 import { generateUniqueCodes } from '../../lib/codes';
+import { eventNights, nightLabel, nightToDb } from '../../lib/nights';
 import { table } from '../../lib/sql';
 import { HttpError } from '../../middleware/errors';
 import { applyPassChanges, type PassChanges } from '../passes';
@@ -45,8 +46,12 @@ export async function confirmUpload(uploadId: string, actor: Actor): Promise<Con
       if (!preview || Date.now() - upload.createdAt.getTime() > UPLOAD_PREVIEW_TTL_MS) {
         throw new HttpError(410, 'preview_expired', 'This preview has expired. Upload the file again.');
       }
-      const event = await tx.event.findUnique({ where: { id: 1 }, select: { maxPassesPerBooking: true } });
+      const event = await tx.event.findUnique({
+        where: { id: 1 },
+        select: { maxPassesPerBooking: true, startsAt: true, gatesOpenAt: true, endsAt: true },
+      });
       if (!event) throw new HttpError(409, 'event_not_configured', 'Set up the event in Settings first.');
+      const nights = eventNights(event);
 
       const validRows = preview.rows.filter((row) => row.valid && row.data);
       const existing = await loadExistingTickets(
@@ -74,8 +79,13 @@ export async function confirmUpload(uploadId: string, actor: Actor): Promise<Con
           skip(`passes must be between 1 and ${event.maxPassesPerBooking}`);
           continue;
         }
+        // The event's dates may have changed since the preview.
+        if (data.night && !nights.includes(data.night)) {
+          skip(`night ${nightLabel(data.night)} is no longer one of the event's nights`);
+          continue;
+        }
         const ticket = existing.get(data.orderId);
-        const outcome = classifyRow(data, ticket, presentColumns);
+        const outcome = classifyRow(data, ticket, presentColumns, nights);
         if (!outcome.ok) {
           skip(outcome.reason);
         } else if (outcome.action === 'create') {
@@ -102,6 +112,7 @@ export async function confirmUpload(uploadId: string, actor: Actor): Promise<Con
         code: codes[index] as string,
         uploadId,
         ...data,
+        night: nightToDb(data.night),
       }));
       for (let i = 0; i < newTickets.length; i += CHUNK) {
         await tx.ticket.createMany({ data: newTickets.slice(i, i + CHUNK) });
@@ -118,9 +129,10 @@ export async function confirmUpload(uploadId: string, actor: Actor): Promise<Con
         await tx.$executeRaw`
           UPDATE ${table('Ticket')} AS t
           SET "name" = v."name", "phone" = v."phone", "email" = v."email", "passCount" = v."passCount",
-              "amount" = v."amount", "category" = v."category", "uploadId" = ${uploadId}::uuid, "updatedAt" = now()
+              "amount" = v."amount", "category" = v."category", "night" = v."night",
+              "uploadId" = ${uploadId}::uuid, "updatedAt" = now()
           FROM jsonb_to_recordset(${json}::jsonb)
-            AS v("id" uuid, "name" text, "phone" text, "email" text, "passCount" int, "amount" numeric, "category" text)
+            AS v("id" uuid, "name" text, "phone" text, "email" text, "passCount" int, "amount" numeric, "category" text, "night" date)
           WHERE t."id" = v."id"`;
       }
 

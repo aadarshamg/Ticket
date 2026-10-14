@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { TICKET_TEMPLATE } from '../config/constants';
 import { prisma, TX_OPTIONS } from '../db';
 import { audit, type Actor } from '../lib/audit';
+import { nightFromDb } from '../lib/nights';
 import { normalisePhone } from '../lib/phone';
 import { HttpError } from '../middleware/errors';
 import type { TicketListQuery, TicketPatch } from '../schemas/ticket';
@@ -27,6 +28,7 @@ function toListItem(ticket: TicketRow) {
     usedCount: ticket._count.passes,
     amount: ticket.amount?.toFixed(2) ?? null,
     category: ticket.category,
+    night: nightFromDb(ticket.night),
     status: ticket.status,
     messageStatus: message?.status ?? 'unsent',
     messageError: message?.errorText ?? null,

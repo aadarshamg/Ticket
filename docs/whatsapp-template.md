@@ -98,7 +98,7 @@ webhook is needed here.
    - Under **Variables**, create ten custom variables: `BUYER`, `EVENT`, `DATE`, `STARTTIME`,
      `VENUECITY`, `PASSES`, `AMOUNT`, `ORDERID`, `ORGANISER`, `PASSCODE` (letters only).
    - Under **Templates**, choose **Create → Mixed Template** (the other forms only allow
-     Marketing). Name `event_ticket_v1`, category **Utility**, no header, and this body, which is
+     Marketing). Name `event_ticket`, category **Utility**, no header, and this body, which is
      the one above with WaSarathi's `#!NAME!#` variables in the same order:
 
      ```
@@ -108,8 +108,11 @@ webhook is needed here.
 
      Tap the button below to view your passes and show the QR code at the entry gate. Each pass admits one person, once. You can forward a pass to each person in your group from the pass page.
 
-     Thank you, #!ORGANISER!#.
+     Thank you, #!ORGANISER!#. See you at the event!
      ```
+
+     WaSarathi only allows lower-case letters and underscores in the name (use `event_ticket`),
+     and refuses a body that starts or ends with a variable, hence the closing words.
    - **Add button → Visit website** (not the quick-reply "Custom"), text `View Passes`, URL type
      **Dynamic**, URL `https://tickets.tspevents.in/b/#!PASSCODE!#` (your `PUBLIC_BASE_URL`
      followed by `/b/` and the PASSCODE variable).

@@ -1,9 +1,11 @@
 import type { Event, Gate, Prisma } from '@prisma/client';
 import { prisma, TX_OPTIONS } from '../db';
 import { audit, type Actor } from '../lib/audit';
+import { eventNights, nightLabel } from '../lib/nights';
 import { hashPin, verifyHash } from '../lib/passwords';
 import { HttpError } from '../middleware/errors';
 import type { EventInput, GateInput } from '../schemas/event';
+import { invalidateEventCache } from './eventCache';
 import { invalidateGateCache } from './gates';
 
 const EVENT_ID = 1;
@@ -16,7 +18,8 @@ export async function getSettings() {
     prisma.event.findUnique({ where: { id: EVENT_ID } }),
     prisma.gate.findMany({ select: gateSelect, orderBy: { name: 'asc' } }),
   ]);
-  return { event, gates };
+  const nights = event ? eventNights(event).map((date) => ({ date, label: nightLabel(date) })) : [];
+  return { event, gates, nights };
 }
 
 type EventFields = Omit<EventInput, 'gates'>;
@@ -133,5 +136,6 @@ export async function saveSettings(input: EventInput, actor: Actor) {
 
   // A changed or removed gate must stop working for signed-in volunteers straight away.
   invalidateGateCache();
+  invalidateEventCache();
   return getSettings();
 }

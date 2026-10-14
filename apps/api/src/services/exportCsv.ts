@@ -1,5 +1,6 @@
 import { TICKET_TEMPLATE } from '../config/constants';
 import { prisma } from '../db';
+import { nightFromDb } from '../lib/nights';
 import { formatIstDate, formatIstTime } from '../lib/time';
 
 /**
@@ -24,6 +25,7 @@ export const EXPORT_COLUMNS = [
   'phone',
   'email',
   'category',
+  'night',
   'amount',
   'passes',
   'passes_used',
@@ -46,6 +48,7 @@ export async function buildExportCsv(): Promise<{ csv: string; rows: number }> {
       phone: true,
       email: true,
       category: true,
+      night: true,
       amount: true,
       passCount: true,
       status: true,
@@ -67,6 +70,7 @@ export async function buildExportCsv(): Promise<{ csv: string; rows: number }> {
         ticket.phone,
         ticket.email,
         ticket.category,
+        nightFromDb(ticket.night),
         ticket.amount?.toFixed(2) ?? null,
         ticket.passes.length,
         used.length,

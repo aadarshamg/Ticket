@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { signal } from '@/lib/feedback';
+import { formatNight } from '@/lib/ist';
 import type { AdmitAllOutcome, LookupResult, ScanOutcome } from '@/lib/types';
 
 interface Props {
@@ -64,7 +65,12 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
         signal('error');
         setMessage({
           kind: 'error',
-          text: outcome.result === 'cancelled' ? 'This booking is cancelled.' : 'Everyone on this booking has already entered.',
+          text:
+            outcome.result === 'cancelled'
+              ? 'This booking is cancelled.'
+              : outcome.result === 'wrong_night'
+                ? `Wrong night: this booking is for ${row.night ? formatNight(row.night) : 'another night'}.`
+                : 'Everyone on this booking has already entered.',
         });
       }
     } catch (err) {
@@ -85,7 +91,14 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
         setMessage({ kind: 'ok', text: `Admitted ${outcome.admitted} for ${row.name}. Everyone has now entered.` });
       } else {
         signal('error');
-        setMessage({ kind: 'error', text: outcome.cancelled ? 'This booking is cancelled.' : 'Nobody was left to admit.' });
+        setMessage({
+          kind: 'error',
+          text: outcome.cancelled
+            ? 'This booking is cancelled.'
+            : outcome.wrongNight
+              ? `Wrong night: this booking is for ${row.night ? formatNight(row.night) : 'another night'}.`
+              : 'Nobody was left to admit.',
+        });
       }
     } catch (err) {
       fail(err);
@@ -150,11 +163,16 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
               <p className="text-lg font-semibold">{row.name}</p>
               <p className="text-sm text-zinc-300">
                 {row.category ? `${row.category} · ` : ''}
+                {row.night ? `${formatNight(row.night)} · ` : ''}
                 {row.entered} of {row.passCount} entered
               </p>
               {row.cancelled ? (
                 <p className="mt-2 inline-block rounded-full bg-amber-500 px-3 py-1 text-sm font-semibold text-zinc-900">
                   Cancelled
+                </p>
+              ) : row.wrongNight && row.remaining > 0 ? (
+                <p className="mt-2 inline-block rounded-full bg-red-600 px-3 py-1 text-sm font-semibold">
+                  Wrong night: for {row.night ? formatNight(row.night) : 'another night'}. Do not admit.
                 </p>
               ) : row.remaining === 0 ? (
                 <p className="mt-2 text-sm text-zinc-400">Everyone has entered.</p>

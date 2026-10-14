@@ -5,6 +5,7 @@ import { Badge, type BadgeTone } from '@/components/Badge';
 import { Dialog } from '@/components/Dialog';
 import { Field } from '@/components/Field';
 import { api, ApiError } from '@/lib/api';
+import { formatNight } from '@/lib/ist';
 import type { Booking, BookingList, BookingStatus, EntryStatus, MessageStatus } from '@/lib/types';
 
 const PAGE_SIZE = 50;
@@ -348,7 +349,7 @@ export default function BookingsPage() {
               <div className="min-w-0">
                 <p className="truncate font-semibold">{booking.name}</p>
                 <p className="text-sm text-zinc-500">
-                  {booking.orderId}{booking.category ? ` · ${booking.category}` : ''} · {rupees(booking.amount)}
+                  {booking.orderId}{booking.category ? ` · ${booking.category}` : ''}{booking.night ? ` · ${formatNight(booking.night)}` : ''} · {rupees(booking.amount)}
                 </p>
                 <p className="text-sm text-zinc-700">{booking.phone}</p>
               </div>
@@ -379,7 +380,11 @@ export default function BookingsPage() {
                   <td className="whitespace-nowrap px-4 py-2 font-medium">{booking.orderId}</td>
                   <td className="px-2 py-2">
                     <div className="max-w-[16rem] truncate">{booking.name}</div>
-                    {booking.category && <div className="text-xs text-zinc-500">{booking.category}</div>}
+                    {(booking.category || booking.night) && (
+                      <div className="text-xs text-zinc-500">
+                        {[booking.category, booking.night ? formatNight(booking.night) : null].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-2">{booking.phone}</td>
                   <td className="whitespace-nowrap px-2 py-2">{rupees(booking.amount)}</td>

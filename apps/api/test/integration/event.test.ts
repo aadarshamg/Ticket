@@ -27,7 +27,7 @@ describe('event settings', () => {
   it('returns null before the event is set up', async () => {
     const res = await agent.get('/api/event');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ event: null, gates: [] });
+    expect(res.body).toEqual({ event: null, gates: [], nights: [] });
   });
 
   it('creates then updates the single settings row, storing times as instants', async () => {

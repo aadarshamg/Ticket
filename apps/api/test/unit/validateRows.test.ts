@@ -19,6 +19,7 @@ describe('validateRows', () => {
       passCount: 4,
       amount: null,
       category: null,
+      night: null,
     });
   });
 
@@ -41,6 +42,7 @@ describe('validateRows', () => {
       passCount: 3,
       amount: '2397.00',
       category: 'VIP',
+      night: null,
     });
     expect(result.raw.order_id).toBe('1001');
   });
@@ -105,6 +107,19 @@ describe('validateRows', () => {
     expect(results[0]!.data).toBeNull();
     expect(results[1]!.errors).toEqual([]);
     expect(results[2]!.errors).toEqual(['Row 7: order_id "A" appears more than once (rows 2, 7)']);
+  });
+
+  it('reads the night on a multi-night event and insists on one when the column is there', () => {
+    const nights = ['2026-10-17', '2026-10-18'];
+    const row = (night: unknown) => validateRows([{ row: 2, cells: { ...good, night } }], 10, nights)[0]!;
+    expect(row('18/10/2026').data?.night).toBe('2026-10-18');
+    expect(row('Sat, 17 Oct 2026 7:00 PM').data?.night).toBe('2026-10-17');
+    expect(row('').errors).toEqual(['Row 2: night is missing (Sat, 17 Oct or Sun, 18 Oct)']);
+    expect(row('20/10/2026').errors).toEqual([
+      "Row 2: night must be one of the event's nights: Sat, 17 Oct or Sun, 18 Oct",
+    ]);
+    // Without the column, the row is left for the booking check to decide.
+    expect(validateRows([{ row: 2, cells: good }], 10, nights)[0]!.data?.night).toBeNull();
   });
 
   it('limits order_id and category length', () => {
