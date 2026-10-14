@@ -56,6 +56,16 @@ export function getMessagingIfConfigured(): Messaging | null {
   }
 }
 
+/** At start-up: puts back in the queue any messages a Redis restart left waiting. Never throws. */
+export function recoverStranded(instance: Messaging): void {
+  instance
+    .recoverStranded()
+    .then((count) => {
+      if (count > 0) console.log(`Re-queued ${count} message(s) that were waiting when Redis restarted.`);
+    })
+    .catch((error: unknown) => console.error('Could not check for waiting messages:', error));
+}
+
 /** Tests install their own queue and fake sender here. */
 export function setMessaging(instance: Messaging | undefined): void {
   messaging = instance;

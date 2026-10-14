@@ -47,9 +47,11 @@ export class Messaging {
 
   constructor(options: MessagingOptions) {
     this.sender = options.sender;
-    const connection = { url: options.redisUrl };
+    // family 0: look up both IPv4 and IPv6 addresses. Some hosts' private networks (Railway's,
+    // for one) are IPv6-only, and Redis clients otherwise try IPv4 only.
+    const connection = { url: options.redisUrl, family: 0 };
 
-    this.redis = new Redis(options.redisUrl, { maxRetriesPerRequest: 2 });
+    this.redis = new Redis(options.redisUrl, { maxRetriesPerRequest: 2, family: 0 });
     this.redis.on('error', (error) => console.error('Redis error:', error.message));
     this.state = new SendState(this.redis, `${options.prefix}:send-state`);
 
@@ -95,6 +97,24 @@ export class Messaging {
         messageIds.slice(i, i + 500).map((messageId) => ({ name: 'send', data: { messageId } })),
       );
     }
+  }
+
+  /**
+   * Re-queues messages the database says are waiting to be sent but Redis has no job for.
+   * That happens when Redis restarts without keeping its data (free Redis plans often do not).
+   * Only runs when the queue is completely empty, so it can never queue a message twice; the
+   * worker re-checks each message's status before sending in any case.
+   */
+  async recoverStranded(): Promise<number> {
+    const counts = await this.queue.getJobCounts('waiting', 'active', 'delayed', 'prioritized');
+    if (Object.values(counts).some((count) => count > 0)) return 0;
+    const stranded = await prisma.message.findMany({ where: { status: 'queued' }, select: { id: true } });
+    if (stranded.length === 0) return 0;
+    await this.enqueue(
+      stranded.map((message) => message.id),
+      `recovered-${Date.now()}`,
+    );
+    return stranded.length;
   }
 
   async pause(reason: PauseReason): Promise<void> {

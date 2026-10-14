@@ -1,7 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { prisma } from './db';
-import { getMessagingIfConfigured } from './messaging';
+import { getMessagingIfConfigured, recoverStranded } from './messaging';
 
 const app = createApp();
 
@@ -16,6 +16,7 @@ if (messaging) {
   console.log(
     `WhatsApp sending: ${messaging.sender.name} sender, ${env.SEND_RATE_PER_SECOND}/s, worker ${env.RUN_WORKER ? 'in this process' : 'separate'}`,
   );
+  if (env.RUN_WORKER) recoverStranded(messaging);
 } else {
   console.warn('WhatsApp sending is disabled: REDIS_URL or the WhatsApp settings are missing.');
 }

@@ -68,15 +68,18 @@ describe('eventInputSchema', () => {
   });
 
   it('validates the gate list', () => {
-    expect(issuePaths({ ...valid, gates: [{ name: 'Gate A', pin: '1234' }] })).toEqual([]);
+    expect(issuePaths({ ...valid, gates: [{ name: 'Gate A', pin: '123456' }] })).toEqual([]);
     expect(issuePaths({ ...valid, gates: [{ name: 'Gate A' }] })).toEqual(['gates.0.pin']);
     expect(issuePaths({ ...valid, gates: [{ name: 'Gate A', pin: '12ab' }] })).toEqual(['gates.0.pin']);
+    // New PINs need at least 6 digits: a 4-digit PIN can be guessed too easily.
+    expect(issuePaths({ ...valid, gates: [{ name: 'Gate A', pin: '1234' }] })).toEqual(['gates.0.pin']);
+    expect(issuePaths({ ...valid, gates: [{ name: 'Gate A', pin: '123456789' }] })).toEqual(['gates.0.pin']);
     expect(
       issuePaths({
         ...valid,
         gates: [
-          { name: 'Gate A', pin: '1234' },
-          { name: 'GATE A', pin: '1234' },
+          { name: 'Gate A', pin: '123456' },
+          { name: 'GATE A', pin: '123456' },
         ],
       }),
     ).toEqual(['gates.1.name', 'gates.1.pin']);

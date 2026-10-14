@@ -1,0 +1,6 @@
+# HTTPS front door for docker-compose.prod.yml.
+# Caddy gets a certificate for DOMAIN automatically and redirects http to https.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}

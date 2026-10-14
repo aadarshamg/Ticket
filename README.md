@@ -4,30 +4,48 @@ One general-admission event, about 3,000 bookings. The organiser uploads a sprea
 bookings; each booking gets a WhatsApp message linking to its passes; each pass has its own QR
 code that admits one person, once.
 
-> Build status: **Phase 7 of 8** (admin login, event settings, spreadsheet upload with preview,
-> bookings table, signed QR passes, public pass pages, WhatsApp sending with queue and webhook,
-> gate scanner with offline mode, live dashboard, CSV export, activity log, data purge).
-> Deployment and the event-day checklist are documented in Phase 8.
+What it does:
+
+- **Organiser** (`/admin`): event settings and gates, spreadsheet upload with a row-by-row check,
+  bookings table, WhatsApp sending in batches, live dashboard, CSV export, activity log.
+- **Buyer** (`/b/{code}`): every pass in the booking, each with its own QR code and a button to
+  forward it on WhatsApp. **Group member** (`/p/{code}`): just their pass. Both keep working
+  offline once opened.
+- **Gate volunteer** (`/scan`): phone-camera scanner with a full-screen green/red/amber result,
+  admit-all for groups, manual lookup, and offline scanning that syncs later.
+
+Contents: [Local setup](#local-setup) · [Uploading bookings](#uploading-bookings) ·
+[Pass pages](#pass-pages-and-qr-codes) · [WhatsApp](#sending-passes-on-whatsapp) ·
+[Gate scanner](#gate-scanner) · [Dashboard](#dashboard-export-and-activity-log) ·
+[Data protection](#data-protection-dpdp-act-2023) ·
+[Environment variables](#environment-variables) · [Security](#security) · [Testing](#testing) ·
+[Deployment](#deployment) · [Event-day checklist](#event-day-checklist)
 
 ## Layout
 
-- `apps/api` – Express + TypeScript API, Prisma schema and migrations, tests
+- `apps/api` – Express + TypeScript API and WhatsApp send worker, Prisma schema and
+  migrations, scripts (seed, create-admin, purge-data, loadtest, migrate), tests
 - `apps/web` – Next.js (App Router) + Tailwind. The browser only talks to this app; it forwards
   `/api/*` to the API, so cookies stay first-party.
+- `docs/whatsapp-template.md` – the WhatsApp template texts to submit to Meta
+- `Dockerfile` + `deploy/start.mjs` – everything in one container (free hosting);
+  `apps/*/Dockerfile` + `docker-compose.prod.yml` + `Caddyfile` – separate services
 
 ## Local setup
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer, a Postgres database and Redis.
 
 1. `npm install`
 2. Copy `.env.example` to `.env` and fill in:
    - `DATABASE_URL` and `DIRECT_URL` – from Supabase (**Connect → ORMs → Prisma**), or the local
      docker-compose URL shown in `.env.example` (`docker compose up -d`).
+   - `REDIS_URL` – `redis://127.0.0.1:6379` (see [Redis](#redis)).
    - `QR_SECRET` and `SESSION_SECRET` – long random strings (command in `.env.example`).
 3. `npm run db:deploy` – creates the tables (in the Postgres schema named by `DB_SCHEMA`).
 4. `npm run seed` – demo event, two gates, an admin login and 3,000 fake bookings. The admin
    password and gate PINs are printed once.
-5. `npm run dev` – web on http://localhost:3000, API on http://localhost:4000.
+5. `npm run dev` – Redis (if found in `.tools/redis`), web on http://localhost:3000 and API on
+   http://localhost:4000.
 6. Sign in at http://localhost:3000/admin.
 
 For a real event, skip the seed and create your login with
@@ -46,6 +64,11 @@ For a real event, skip the seed and create your login with
 | `npm run db:migrate -- --name <change>` | Create a migration after editing `schema.prisma` |
 | `npm run seed` | Load demo data (`-- --count=200` for fewer bookings) |
 | `npm run create-admin -- --email …` | Create an organiser login or reset its password |
+| `npm run build` | Production builds of both apps |
+| `npm run redis` | Start the local Redis from `.tools/redis` (Windows, no Docker) |
+| `npm run worker` | Run the WhatsApp send worker on its own (with `RUN_WORKER=false` on the API) |
+| `npm run loadtest` | Gate load test (demo data only) – see [Load test](#load-test) |
+| `npm run purge-data` | Preview, then (`-- --confirm`) delete all booking data after the event |
 
 ## Uploading bookings
 
@@ -293,6 +316,324 @@ cannot be undone, so download the CSV first if you are required to keep a record
 Also delete, by hand: any CSV exports and spreadsheets on your own computers, and database
 backups held by your hosting provider once their retention allows it.
 
+## Environment variables
+
+All configuration comes from the environment (`.env` locally; your host's settings in
+production). Nothing secret is in the repository. `.env.example` lists every variable.
+
+| Variable | Needed | What it is |
+|---|---|---|
+| `NODE_ENV` | production | `production` on the server. Turns on secure cookies and the start-up checks below. |
+| `DATABASE_URL` | always | Postgres connection string. With a pooler (Supabase), the pooled one. |
+| `DIRECT_URL` | with a pooler | Direct connection, used for migrations. Defaults to `DATABASE_URL`. |
+| `DB_SCHEMA` | optional | Postgres schema for the tables. Default `ticketing`. |
+| `REDIS_URL` | for sending | Redis for the WhatsApp send queue. Required in production. |
+| `QR_SECRET` | always | Signs pass QR codes and the offline list. 32+ random characters. **Never change it after passes have been sent.** |
+| `SESSION_SECRET` | always | Signs login sessions. 32+ random characters, different from `QR_SECRET`. Changing it signs everyone out. |
+| `PUBLIC_BASE_URL` | always | The site's public address, e.g. `https://passes.example.com`. Used in pass links and must match the WhatsApp template's button URL. |
+| `API_INTERNAL_URL` | web app | Where the web app reaches the API. Needed when the web app is **built** and when it runs. |
+| `TRUST_PROXY` | production | How many proxies sit in front of the web app and add the visitor's address. Normally `1`. |
+| `MESSAGE_SENDER` | optional | `mock` (default; logs only) or `cloud` (Meta WhatsApp Cloud API). |
+| `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, `WA_APP_SECRET`, `WA_VERIFY_TOKEN` | for `cloud` | See [Test mode and real sending](#test-mode-and-real-sending). |
+| `WA_GRAPH_VERSION` | optional | Graph API version, default `v23.0`. |
+| `SEND_RATE_PER_SECOND` | optional | Messages per second, default 20. |
+| `ADMIN_SESSION_HOURS`, `GATE_SESSION_HOURS` | optional | Sign-in lifetimes, default 12 and 16 hours. |
+
+Generate a secret with:
+`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
+
+In production the API refuses to start, and says why, if `PUBLIC_BASE_URL` is not https, Redis is
+missing, the two secrets are the same, or `MESSAGE_SENDER=cloud` without all four `WA_*` values.
+
+## Security
+
+- **Transport:** HTTPS only in production. The app sends HSTS, a Content-Security-Policy (no
+  third-party scripts, no eval), `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and
+  `X-Robots-Tag: noindex`; `robots.txt` disallows everything.
+- **Sessions:** signed, `HttpOnly`, `SameSite=Strict` cookies, `Secure` in production. Every admin
+  and scanner write also needs a per-session CSRF token.
+- **Passwords and PINs:** bcrypt. Failed admin logins, wrong gate PINs, scans (per device) and
+  wrong pass links are all rate-limited. Failed attempts appear in the activity log.
+- **Passes:** HMAC-signed QR codes, verified on the server. A check-in is a single conditional
+  update, so one pass can never admit two people, even under simultaneous scans.
+- **Least data:** volunteers see a name, category and pass counts. Pass pages show no phone
+  numbers. The single-pass page shows nothing about the buyer or the rest of the booking.
+- **Webhook:** every delivery report must carry Meta's `X-Hub-Signature-256`.
+- **Inputs:** validated with zod; SQL goes through Prisma parameters; CSV export neutralises
+  spreadsheet formulas.
+
+Deployment rules that the security depends on:
+
+- **Put a proxy that sets `X-Forwarded-For` in front of the web app** (Caddy, or the load balancer
+  of Render/Railway). The rate limits identify visitors by that header. Never expose the web
+  container's port directly to the internet.
+- **Do not expose the API or Redis publicly.** Only the web app talks to the API.
+- Use gate PINs of at least 6 digits, set them shortly before the event, and reset a gate's PIN
+  if a phone is lost: that signs its volunteers out immediately.
+
+## Testing
+
+```
+npm run typecheck           # both apps
+npm run test:unit           # fast, no database
+npm run test:integration    # against Postgres (schema <DB_SCHEMA>_test) and Redis
+npm test                    # unit, then integration
+```
+
+Integration tests need `DATABASE_URL` and a running Redis. They create and empty their own
+`_test` schema and never touch real bookings. Against a database on another continent the full
+suite takes about 20 minutes; next to its database, a couple.
+
+What is covered: phone normalisation, spreadsheet validation, code generation, QR signing;
+upload → confirm → passes created; re-upload updates a booking; scan valid → used; scan twice →
+already used; **concurrent scans of one pass → exactly one admitted**; admit-all; cancelled
+bookings; webhook signature rejection; sending with retries and auto-pause; offline sync and
+conflicts; stats, export, activity log and purge.
+
+### Load test
+
+`npm run loadtest` runs 50 scans a second for 2 minutes (6,000 different passes over 25 scanner
+sessions, using autocannon) and passes if 95% of scans are answered in under 500 ms and every
+scan is correct. It refuses to run unless every booking is demo data, and puts the passes back
+afterwards.
+
+```
+npm run seed
+npm run loadtest                                             # http://localhost:4000
+npm run loadtest -- --url https://passes.example.com         # through the deployed site
+npm run loadtest -- --rate 20 --duration 30                  # a lighter run
+```
+
+A successful scan is one database round trip, so the result depends almost entirely on how
+close the API is to its database. **Run it against the deployed system before the event.**
+
+**Result on the development machine** (October 2026; a Supabase database in Tokyo reached from
+India, where a single database round trip takes about 800 ms): every one of the 1,589 scans
+answered was correct, with no errors or timeouts, at 13 scans a second; p50 1.7 s, p95 3.4 s.
+That does **not** meet the target, and cannot from there: one round trip alone takes longer than
+500 ms. With the app and database in the same region a round trip takes 1–3 ms, so **run it again
+after deploying.** On the same setup, making each successful scan a single database statement
+(rather than two rounds of four queries) raised throughput from 3 to 13 scans a second and cut
+the p95 from 9.4 s to 3.4 s.
+
+## Deployment
+
+The system is two services plus two databases:
+
+| Piece | What it is | Reachable from the internet? |
+|---|---|---|
+| `web` | Next.js: admin, pass pages, scanner. Forwards `/api/*` to the API. | Yes, through HTTPS |
+| `api` | Express API and the WhatsApp send worker | No. Only `web` calls it. |
+| Postgres 15+ | Bookings, passes, logs | No |
+| Redis 6.2+ | The send queue. Turn persistence (AOF) on. | No |
+
+Host the API in the same region as its database: a scan makes two database round trips, and
+distance between the two is what makes scans slow. Mumbai is ideal for an event in India
+(Option C); Render and Railway have no India region, so use Singapore for both app and database.
+
+There are two ways to package it, both built **from the repository root**:
+
+```
+# One container with everything (Option A)
+docker build -t ticketing .
+
+# Or two services (Options B and C)
+docker build -f apps/api/Dockerfile -t ticketing-api .
+docker build -f apps/web/Dockerfile --build-arg API_INTERNAL_URL=http://api:4000 -t ticketing-web .
+```
+
+Every container applies pending database migrations when it starts. For the two-service
+setup, `API_INTERNAL_URL` must be given to the web image at build time (the `/api` forwarding
+rule is fixed in the build) and again at run time (the pass pages read it).
+
+> The Dockerfiles and `docker-compose.prod.yml` were written without Docker available on the
+> development machine. What they run was checked directly instead: `npm ci`, the API's
+> TypeScript build, the self-contained Next.js build, and the one-container start script
+> (`deploy/start.mjs`), which was run in production mode in the same folder layout as the image
+> (migrations, then the API, then the web app, all served from one port). The images themselves
+> have not been built. Build once and open the site before relying on it.
+
+### Option A (free): Render, one service, with Supabase Postgres
+
+Everything runs in **one** container (the root `Dockerfile`: web app, API and send worker
+together, started by `deploy/start.mjs`). Render's free plan allows 750 hours a month, which
+covers one service running all month. Supabase's free plan holds the database.
+
+**What "free" costs you:**
+
+- The service **goes to sleep after 15 minutes without visitors**, and the next visitor waits
+  about a minute while it wakes. While you prepare that is only an annoyance. For the event week,
+  keep it awake with a free uptime monitor (for example UptimeRobot) opening
+  `https://<your-app>.onrender.com/api/health` every 5 minutes, or switch this one service to a
+  paid instance for that month only.
+- **Free Redis keeps nothing when it restarts.** That is handled: when the app starts it puts any
+  messages that were waiting back in the queue, and nothing is ever sent twice.
+- **A free instance has very little processor power.** It is enough for preparing and sending,
+  but **run the load test against it before the event** and upgrade for the day if it is slow.
+- Render has no India region; use **Singapore** for both Render and Supabase.
+- WhatsApp messages themselves are charged by Meta per message; no host can make that free.
+
+Steps:
+
+1. **Database.** In Supabase create a new project in *Southeast Asia (Singapore)*. Under
+   **Connect → ORMs → Prisma**, copy `DATABASE_URL` and `DIRECT_URL` and put the database
+   password in place of `[YOUR-PASSWORD]`.
+2. **Redis.** In Render: **New → Key Value**, region *Singapore*, plan *Free*. Copy its
+   **Internal Key Value URL**.
+3. **The app.** **New → Web Service**, connect this GitHub repository. Language **Docker** (it
+   finds the `Dockerfile` at the top of the repository), region *Singapore*, instance type
+   **Free**, health check path `/api/health`. Environment variables:
+
+   | Variable | Value |
+   |---|---|
+   | `NODE_ENV` | `production` |
+   | `DATABASE_URL`, `DIRECT_URL` | from Supabase |
+   | `REDIS_URL` | the Internal Key Value URL |
+   | `QR_SECRET`, `SESSION_SECRET` | two different long random values |
+   | `PUBLIC_BASE_URL` | `https://<your-app>.onrender.com` (the address Render shows), or your own domain |
+   | `TRUST_PROXY` | `1` |
+   | `MESSAGE_SENDER` | `mock` to begin with; `cloud` plus the four `WA_*` values for real sending |
+
+   Do not set `PORT`; Render provides it.
+4. **Create your login,** from this repository on your own computer (it only needs the
+   database). In PowerShell:
+
+   ```
+   $env:DATABASE_URL = "<the Supabase DATABASE_URL>"
+   $env:DIRECT_URL = "<the Supabase DIRECT_URL>"
+   npm run create-admin -- --email you@example.com --name "Your Name"
+   ```
+
+5. Open `https://<your-app>.onrender.com/admin` and sign in. The first visit after a pause takes
+   about a minute.
+
+The app applies database migrations each time it starts, and Render redeploys it on every push
+to the main branch.
+
+### Option B: Railway (web, API and Redis as separate services) with Supabase Postgres
+
+Railway builds each service from its Dockerfile and provides HTTPS and a private network between
+services. It has no India region; **Singapore** is the nearest, so create the database there too.
+
+**Cost.** A new Railway account includes a one-time $5 credit; after that the Hobby plan is
+$5 a month. This app (web, API and Redis running continuously) uses roughly that much, so for a
+single event create the account shortly before sending the passes and delete the project
+afterwards. Supabase's free plan is enough for the database, but it pauses a project after about
+a week without use: open the admin dashboard now and then in the run-up.
+
+1. **Database.** In Supabase create a new project in *Southeast Asia (Singapore)*. Under
+   **Connect → ORMs → Prisma**, copy `DATABASE_URL` and `DIRECT_URL` and put the database
+   password in place of `[YOUR-PASSWORD]`.
+2. **Project.** In Railway: **New Project → Deploy from GitHub repo**, choose this repository,
+   and pick the Singapore region. Rename the service it creates to `api`.
+3. **Redis.** In the project: **Create → Database → Redis**. Leave it private.
+4. **`api` service → Variables:**
+
+   | Variable | Value |
+   |---|---|
+   | `RAILWAY_DOCKERFILE_PATH` | `apps/api/Dockerfile` |
+   | `NODE_ENV` | `production` |
+   | `PORT` | `4000` |
+   | `DATABASE_URL`, `DIRECT_URL` | from Supabase |
+   | `REDIS_URL` | `${{Redis.REDIS_URL}}` |
+   | `QR_SECRET`, `SESSION_SECRET` | two different long random values |
+   | `PUBLIC_BASE_URL` | the site's public https address (step 6) |
+   | `TRUST_PROXY` | `1` |
+   | `MESSAGE_SENDER` | `mock` to begin with; `cloud` plus the four `WA_*` values for real sending |
+
+   Do **not** give this service a public domain. Leave its root directory as the repository root.
+5. **`web` service.** **Create → GitHub Repo**, the same repository, named `web`. Variables:
+
+   | Variable | Value |
+   |---|---|
+   | `RAILWAY_DOCKERFILE_PATH` | `apps/web/Dockerfile` |
+   | `API_INTERNAL_URL` | `http://api.railway.internal:4000` (the `api` service's private address, shown under its Settings → Networking) |
+   | `PORT` | `3000` |
+
+6. **Address.** In `web` → Settings → Networking, **Generate Domain** (or add your own domain).
+   Put that https address into `PUBLIC_BASE_URL` on the `api` service and redeploy `api`.
+7. **Create your login.** With the [Railway CLI](https://docs.railway.com/cli) linked to the
+   project, run this on your own computer in this repository. It uses the `api` service's
+   variables to reach the database:
+   `railway run --service api npm run create-admin -- --email you@example.com --name "Your Name"`
+
+The API applies database migrations each time it starts. Railway redeploys both services on
+every push to the main branch.
+
+### Option C: AWS Lightsail, Mumbai (one server, managed Postgres)
+
+1. **Database.** Lightsail → Databases → create **PostgreSQL** in *Mumbai (ap-south-1)*. Note
+   the endpoint, user and password. Set both `DATABASE_URL` and `DIRECT_URL` to
+   `postgresql://USER:PASSWORD@ENDPOINT:5432/postgres?sslmode=require`.
+2. **Server.** Create a Lightsail instance in Mumbai (Ubuntu, 2 GB RAM or more), attach a
+   static IP, and open ports 80 and 443 in its firewall. Install Docker
+   (`curl -fsSL https://get.docker.com | sh`).
+3. **Domain.** Point an A record (for example `passes.example.com`) at the static IP.
+4. **Code and settings.** On the server: `git clone` this repository, `cp .env.example .env`,
+   and fill in `DOMAIN`, `PUBLIC_BASE_URL=https://<domain>`, the database URLs, the two secrets
+   and `MESSAGE_SENDER` with the `WA_*` values.
+5. **Start.** `docker compose -f docker-compose.prod.yml up -d --build`. Caddy obtains the HTTPS
+   certificate by itself within a minute.
+6. **Create your login.**
+   `docker compose -f docker-compose.prod.yml exec -e ADMIN_PASSWORD='choose-a-long-password' api node dist/scripts/create-admin.js --email you@example.com --name "Your Name"`
+7. Sign in at `https://<domain>/admin`, fill in Settings and add the gates.
+
+**Redis.** The compose file runs Redis next to the app with append-only persistence, which is
+enough for one event. To use a managed Redis instead (AWS ElastiCache reached through Lightsail
+VPC peering, or Upstash in Mumbai), set `REDIS_URL` in the `api` service and remove the `redis`
+service.
+
+To update: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+
+### After deploying, in this order
+
+1. `https://<domain>/api/health` answers `{"ok":true,"db":true}`.
+2. Sign in, fill in Settings, add gates with 6-digit PINs.
+3. Register the WhatsApp webhook (see [Test mode and real sending](#test-mode-and-real-sending)).
+4. Upload a small real file, send a **test message** to your own phone, open the pass link.
+5. Open `/scan` on a phone, sign in with a gate PIN, scan that pass: green. Scan again: red.
+6. Run the load test against a seeded copy, not against real bookings.
+
+## Event-day checklist
+
+**A few days before**
+
+- [ ] The WhatsApp template is approved, and the button URL matches `PUBLIC_BASE_URL`.
+- [ ] Event name, venue, times and helpline are correct in Settings (they go into every message).
+- [ ] Upload the bookings; fix every invalid row; upload again until none are left.
+- [ ] Send a **test message** to your team's numbers. Open the link, check the passes.
+
+**Sending**
+
+- [ ] Send to the **first 10** bookings. Wait until they show Delivered. Ask one or two buyers.
+- [ ] Send to the **next 200**. Check the failure count; open Bookings → Failed for the reasons.
+- [ ] Send **the rest**. If sending pauses itself, fix the cause before pressing Resume.
+- [ ] Correct wrong phone numbers in Bookings and resend those.
+
+**On the day, before the gates open**
+
+- [ ] Set a fresh 6-digit PIN for each gate and give it only to that gate's volunteers.
+- [ ] **At each gate, on each phone: open `/scan` with a connection, sign in, and check it shows
+      "Saved list: N valid passes".** That is the offline list; without it a phone cannot scan
+      if the network drops.
+- [ ] Scan one test pass at each gate: green the first time, red the second.
+- [ ] Phones charged, power banks available, screen brightness up.
+- [ ] One organiser has the admin dashboard open on a laptop.
+
+**While the gates are open**
+
+- [ ] Watch Overview: people entered, per gate.
+- [ ] A guest whose QR will not scan: **Find booking**, by order ID or last 4 phone digits.
+- [ ] A phone showing "No connection" keeps working from its saved list. When the connection
+      returns, check its "waiting to upload" count goes to zero.
+- [ ] If a phone is lost, reset that gate's PIN in Settings.
+
+**Afterwards**
+
+- [ ] Check Admin → Conflicts once every phone has uploaded.
+- [ ] Download the CSV if you need a record.
+- [ ] Put a reminder in the calendar: **30 days after the event, run `npm run purge-data -- --confirm`.**
+
 ## Notes
 
 - Tables live in the `ticketing` Postgres schema rather than `public`, because Supabase exposes
@@ -301,3 +642,5 @@ backups held by your hosting provider once their retention allows it.
   name ends in `_test`.
 - Event times are stored as `timestamptz` and entered/shown in Asia/Kolkata.
 - Gate PINs are stored as bcrypt hashes; they can be reset but not viewed.
+- The Excel reader (`xlsx`) is installed from `cdn.sheetjs.com`; the copy on npm is an old
+  release with known advisories. Docker builds therefore need to reach that host.

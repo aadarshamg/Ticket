@@ -1,0 +1,20 @@
+# Keep images small and, above all, keep secrets out of them.
+.env
+.env.*
+!.env.example
+
+.git
+.tools
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+
+apps/api/test
+docs
+README.md
+docker-compose*.yml
+Caddyfile

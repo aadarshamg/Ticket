@@ -23,14 +23,25 @@ export function invalidateGateCache(): void {
 }
 
 /** True if a session signed in to `gateId` when the gate's version was `gateVersion` is still valid. */
+/** Refreshing at most this often when a session names a gate the cache does not know yet. */
+const MISS_REFRESH_MS = 2000;
+
+async function loadGates() {
+  const gates = await prisma.gate.findMany({ select: { id: true, active: true, updatedAt: true } });
+  cache = {
+    at: Date.now(),
+    gates: new Map(gates.map((gate) => [gate.id, { active: gate.active, version: gate.updatedAt.getTime() }])),
+  };
+  return cache;
+}
+
 export async function isGateSessionCurrent(gateId: string, gateVersion: number): Promise<boolean> {
-  if (!cache || Date.now() - cache.at > CACHE_MS) {
-    const gates = await prisma.gate.findMany({ select: { id: true, active: true, updatedAt: true } });
-    cache = {
-      at: Date.now(),
-      gates: new Map(gates.map((gate) => [gate.id, { active: gate.active, version: gate.updatedAt.getTime() }])),
-    };
+  let current = !cache || Date.now() - cache.at > CACHE_MS ? await loadGates() : cache;
+  let gate = current.gates.get(gateId);
+  // A gate created moments ago (possibly by another API instance) is not in the cache yet.
+  if ((!gate || gate.version !== gateVersion) && Date.now() - current.at > MISS_REFRESH_MS) {
+    current = await loadGates();
+    gate = current.gates.get(gateId);
   }
-  const gate = cache.gates.get(gateId);
   return gate !== undefined && gate.active && gate.version === gateVersion;
 }

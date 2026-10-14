@@ -252,7 +252,7 @@ export default function SettingsPage() {
           <h2 className="font-semibold">Entry gates</h2>
           <p className="text-sm text-slate-500">
             Volunteers open the scanner page (this site&apos;s address followed by <code>/scan</code>) on their
-            phone and sign in with a gate&apos;s PIN (4 to 8 digits; 6 is a good length). PINs are stored
+            phone and sign in with a gate&apos;s PIN (6 to 8 digits). PINs are stored
             hashed and cannot be viewed later, so note each one when you set it.
           </p>
         </div>
@@ -272,7 +272,7 @@ export default function SettingsPage() {
                   error={errors[`gates.${index}.pin`] ?? errors[`gates.${index}.id`]}
                   hint={gate.id ? 'Leave blank to keep the current PIN.' : undefined}>
                   <input id={`gate-pin-${gate.key}`} className={inputClass(`gates.${index}.pin`)}
-                    inputMode="numeric" autoComplete="off" pattern="\d{4,8}" maxLength={8}
+                    inputMode="numeric" autoComplete="off" pattern="\d{6,8}" maxLength={8}
                     value={gate.pin}
                     onChange={(e) => setGate(gate.key, { pin: e.target.value.replace(/\D/g, '') })} />
                 </Field>

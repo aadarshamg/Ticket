@@ -33,7 +33,7 @@ export const gateInputSchema = z.object({
   /** Required for a new gate; on an existing gate it resets the PIN. */
   pin: z
     .string()
-    .regex(/^\d{4,8}$/, 'PIN must be 4 to 8 digits')
+    .regex(/^\d{6,8}$/, 'PIN must be 6 to 8 digits')
     .optional(),
   active: z.boolean().default(true),
 });

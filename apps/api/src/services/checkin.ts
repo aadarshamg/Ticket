@@ -104,6 +104,69 @@ function auditAdmit(
   });
 }
 
+interface AdmittedRow {
+  passNo: number;
+  usedAt: Date;
+  ticketId: string;
+  name: string;
+  category: string | null;
+  passCount: number;
+  /** Valid passes on the booking just before this scan (the statement sees its starting snapshot). */
+  validBefore: number;
+  /** 1 if the scan log row was written; 0 if its clientRef was already taken. */
+  logged: number;
+}
+
+/**
+ * The common case at a gate, done in a single database round trip: mark the pass used (only if
+ * it is still valid), write the scan log and the audit entry, and read what the volunteer sees.
+ * Returns null if the pass was not valid, leaving the caller to work out why.
+ */
+async function admitInOneTrip(passId: string, session: GateSession, clientRef?: string): Promise<ScanOutcome | null> {
+  const rows = await prisma.$queryRaw<AdmittedRow[]>`
+    WITH upd AS (
+      UPDATE ${table('Pass')}
+      SET "status" = 'used', "usedAt" = now(), "usedGate" = ${session.gate}
+      WHERE "id" = ${passId}::uuid AND "status" = 'valid'
+      RETURNING "id", "ticketId", "passNo", "usedAt"
+    ),
+    logged AS (
+      INSERT INTO ${table('Checkin')} ("id", "passId", "gate", "deviceId", "result", "clientRef")
+      SELECT gen_random_uuid(), upd."id", ${session.gate}, ${session.deviceId}, 'ok', ${clientRef ?? null}::text
+      FROM upd
+      ON CONFLICT ("clientRef") DO NOTHING
+      RETURNING 1
+    ),
+    audited AS (
+      INSERT INTO ${table('AuditLog')} ("id", "actorType", "actorId", "actorLabel", "action", "entityType", "entityId")
+      SELECT gen_random_uuid(), 'gate', ${session.gateId}, ${`${session.gate} / ${session.deviceId}`}, 'checkin.scan', 'Pass', upd."id"::text
+      FROM upd
+      RETURNING 1
+    )
+    SELECT upd."passNo", upd."usedAt", t."id" AS "ticketId", t."name", t."category",
+           (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id") AS "passCount",
+           (SELECT count(*)::int FROM ${table('Pass')} x WHERE x."ticketId" = t."id" AND x."status" = 'valid') AS "validBefore",
+           (SELECT count(*)::int FROM logged) AS "logged"
+    FROM upd
+    JOIN ${table('Ticket')} t ON t."id" = upd."ticketId"`;
+
+  const row = rows[0];
+  if (!row) return null;
+  // The scanner re-used an ID that is already taken: still log the scan, just without it.
+  if (row.logged === 0) await logCheckins(prisma, session, [passId], 'ok');
+  return {
+    result: 'ok',
+    booking: {
+      ticketId: row.ticketId,
+      name: row.name,
+      category: row.category,
+      passCount: row.passCount,
+      remaining: Math.max(0, row.validBefore - 1),
+    },
+    pass: { passNo: row.passNo, usedAt: row.usedAt, usedGate: session.gate },
+  };
+}
+
 /**
  * Checks a scanned QR code and, if it is a valid unused pass, marks it used.
  *
@@ -123,24 +186,10 @@ export async function scanPass(qr: unknown, session: GateSession, clientRef?: st
     return { result: 'invalid' };
   }
 
-  const usedAt = new Date();
-  const updated = await prisma.pass.updateMany({
-    where: { id: passId, status: 'valid' },
-    data: { status: 'used', usedAt, usedGate: session.gate },
-  });
+  const admitted = await admitInOneTrip(passId, session, clientRef);
+  if (admitted) return admitted;
 
-  if (updated.count === 1) {
-    // One further round trip: what to show, the scan log and the audit entry, all at once.
-    const [info] = await Promise.all([
-      loadPassInfo(passId),
-      logCheckins(prisma, session, [passId], 'ok', clientRef),
-      auditAdmit(prisma, session, 'checkin.scan', { type: 'Pass', id: passId }),
-    ]);
-    if (!info) return { result: 'ok' }; // removed in the same instant; the admission still stands
-    return { result: 'ok', ...describe(info) };
-  }
-
-  // Nothing was updated: find out why, for the volunteer's screen.
+  // Nothing was updated: find out why, for the volunteer's screen. (The uncommon path.)
   const info = await loadPassInfo(passId);
   if (!info) {
     // Correctly signed, but the pass no longer exists (its booking was reduced or removed).

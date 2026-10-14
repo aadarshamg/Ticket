@@ -21,7 +21,8 @@
     "create-admin": "npm run create-admin -w apps/api --",
     "redis": "node scripts/dev-redis.mjs",
     "worker": "npm run worker -w apps/api",
-    "purge-data": "npm run purge-data -w apps/api --"
+    "purge-data": "npm run purge-data -w apps/api --",
+    "loadtest": "npm run loadtest -w apps/api --"
   },
   "devDependencies": {
     "concurrently": "^9.2.5"

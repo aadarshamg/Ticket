@@ -251,6 +251,36 @@ describe('POST /api/send', () => {
   });
 });
 
+describe('after Redis loses its data', () => {
+  it('puts messages that were waiting back in the queue, and sends each once', async () => {
+    const one = await createTicket({ orderId: 'ORD-1', passCount: 1 });
+    const two = await createTicket({ orderId: 'ORD-2', passCount: 1 });
+    // The database says these are waiting, but Redis restarted empty: there are no jobs for them.
+    await prisma.message.createMany({
+      data: [one, two].map((ticket) => ({ ticketId: ticket.id, template: TICKET_TEMPLATE, status: 'queued' as const })),
+    });
+
+    expect(await messaging.recoverStranded()).toBe(2);
+    await waitForNoneQueued();
+    expect(await statusCounts()).toEqual({ sent: 2 });
+    expect(sender.sent).toHaveLength(2);
+
+    // Nothing is waiting any more, so a second check (e.g. the next restart) does nothing.
+    expect(await messaging.recoverStranded()).toBe(0);
+    expect(sender.sent).toHaveLength(2);
+  });
+
+  it('leaves the queue alone while it still has work in it', async () => {
+    const ticket = await createTicket({ orderId: 'ORD-1', passCount: 1 });
+    await post('/api/send/pause');
+    await post('/api/send', { mode: 'unsent' }); // one real job, held by the pause
+    expect(await messaging.recoverStranded()).toBe(0); // must not add a second job for it
+    await post('/api/send/resume');
+    await waitForNoneQueued();
+    expect(sender.tries.get(ticket.phone)).toBe(1);
+  });
+});
+
 describe('POST /api/tickets/:id/resend', () => {
   it('sends one booking again with a new message ID', async () => {
     const ticket = await createTicket({ orderId: 'ORD-1', passCount: 2 });

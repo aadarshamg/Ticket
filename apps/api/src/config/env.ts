@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { loadRootEnv } from './loadEnv';
+import { productionConfigProblems } from './production';
 
 loadRootEnv();
 
@@ -68,6 +69,12 @@ if (!parsed.success) {
     `Invalid environment configuration:\n${lines.join('\n')}\n` +
       'Copy .env.example to .env and fill in the missing values.',
   );
+}
+
+// In production, refuse to start with settings that would fail on the day.
+const productionProblems = productionConfigProblems(parsed.data);
+if (productionProblems.length > 0) {
+  throw new Error(`Not safe to run in production:\n${productionProblems.map((line) => `  - ${line}`).join('\n')}`);
 }
 
 export const env = parsed.data;

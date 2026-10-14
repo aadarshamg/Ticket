@@ -1,0 +1,73 @@
+# Production on a single server (for example AWS Lightsail, Mumbai), with managed Postgres.
+#
+#   1. Put the production values in .env (see README > Environment variables). At least:
+#        DOMAIN, PUBLIC_BASE_URL, DATABASE_URL, DIRECT_URL, QR_SECRET, SESSION_SECRET
+#   2. docker compose -f docker-compose.prod.yml up -d --build
+#
+# Caddy obtains and renews the HTTPS certificate for DOMAIN by itself; the domain's DNS
+# must already point at this server and ports 80 and 443 must be open.
+# Only Caddy is reachable from outside. The API, web app and Redis talk on a private network.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env, e.g. passes.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      REDIS_URL: redis://redis:6379
+      # One proxy (Caddy) adds the visitor's address in front of the web app.
+      TRUST_PROXY: "1"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Holds the WhatsApp send queue. Append-only persistence, so queued messages survive a restart.
+  # Swap for a managed Redis by setting REDIS_URL above and removing this service.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redisdata:

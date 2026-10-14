@@ -4,7 +4,7 @@
  */
 import { env } from './config/env';
 import { prisma } from './db';
-import { getSender } from './messaging';
+import { getSender, recoverStranded } from './messaging';
 import { Messaging } from './messaging/messaging';
 
 if (!env.REDIS_URL) {
@@ -20,6 +20,7 @@ const messaging = new Messaging({
   runWorker: true,
 });
 console.log(`Send worker started: ${messaging.sender.name} sender, ${env.SEND_RATE_PER_SECOND}/s`);
+recoverStranded(messaging);
 
 function shutdown(signal: string) {
   console.log(`${signal} received, finishing current messages`);

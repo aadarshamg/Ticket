@@ -78,8 +78,8 @@ describe('event settings', () => {
 
 describe('gates', () => {
   const gates = [
-    { name: 'Gate A', pin: '1234' },
-    { name: 'Gate B', pin: '5678' },
+    { name: 'Gate A', pin: '123456' },
+    { name: 'Gate B', pin: '567890' },
   ];
 
   it('creates gates with hashed PINs and never returns the PIN or its hash', async () => {
@@ -87,11 +87,11 @@ describe('gates', () => {
     expect(res.status).toBe(200);
     expect(res.body.gates.map((g: { name: string }) => g.name)).toEqual(['Gate A', 'Gate B']);
     expect(JSON.stringify(res.body)).not.toMatch(/pin/i);
-    expect(JSON.stringify(res.body)).not.toContain('1234');
+    expect(JSON.stringify(res.body)).not.toContain('123456');
 
     const stored = await prisma.gate.findUniqueOrThrow({ where: { name: 'Gate A' } });
-    expect(stored.pinHash).not.toContain('1234');
-    expect(await bcrypt.compare('1234', stored.pinHash)).toBe(true);
+    expect(stored.pinHash).not.toContain('123456');
+    expect(await bcrypt.compare('123456', stored.pinHash)).toBe(true);
     expect(await prisma.auditLog.count({ where: { action: 'gate.create' } })).toBe(2);
   });
 
@@ -108,8 +108,8 @@ describe('gates', () => {
     const res = await put(
       validEventBody({
         gates: [
-          { id: gateA.id, name: 'Main Gate', active: false, pin: '9999' },
-          { name: 'Gate C', pin: '4321' },
+          { id: gateA.id, name: 'Main Gate', active: false, pin: '999999' },
+          { name: 'Gate C', pin: '432109' },
         ],
       }),
     );
@@ -118,14 +118,14 @@ describe('gates', () => {
 
     const main = await prisma.gate.findUniqueOrThrow({ where: { id: gateA.id } });
     expect(main.active).toBe(false);
-    expect(await bcrypt.compare('9999', main.pinHash)).toBe(true);
-    expect(await bcrypt.compare('1234', main.pinHash)).toBe(false);
+    expect(await bcrypt.compare('999999', main.pinHash)).toBe(true);
+    expect(await bcrypt.compare('123456', main.pinHash)).toBe(false);
     expect(await prisma.gate.findUnique({ where: { name: 'Gate B' } })).toBeNull();
 
     const update = await prisma.auditLog.findFirstOrThrow({ where: { action: 'gate.update' } });
     expect(update.meta).toEqual({ name: 'Main Gate', active: false, pinReset: true });
     expect(await prisma.auditLog.count({ where: { action: 'gate.delete' } })).toBe(1);
-    expect(JSON.stringify(await prisma.auditLog.findMany())).not.toContain('9999');
+    expect(JSON.stringify(await prisma.auditLog.findMany())).not.toContain('999999');
   });
 
   it('keeps the existing PIN when a gate is saved without one', async () => {
@@ -145,21 +145,21 @@ describe('gates', () => {
     const [a, b] = first.body.gates;
 
     const res = await put(
-      validEventBody({ gates: [{ id: a.id, name: a.name }, { id: b.id, name: b.name, pin: '1234' }] }),
+      validEventBody({ gates: [{ id: a.id, name: a.name }, { id: b.id, name: b.name, pin: '123456' }] }),
     );
     expect(res.status).toBe(409);
     expect(res.body.error.details[0]).toMatchObject({ path: 'gates.1.pin' });
 
     const stored = await prisma.gate.findUniqueOrThrow({ where: { id: b.id } });
-    expect(await bcrypt.compare('5678', stored.pinHash)).toBe(true);
+    expect(await bcrypt.compare('567890', stored.pinHash)).toBe(true);
   });
 
   it('refuses a new gate without a PIN, duplicate PINs and duplicate names', async () => {
     const res = await put(
       validEventBody({
         gates: [
-          { name: 'Gate A', pin: '1234' },
-          { name: 'gate a', pin: '1234' },
+          { name: 'Gate A', pin: '123456' },
+          { name: 'gate a', pin: '123456' },
           { name: 'Gate C' },
           { name: 'Gate D', pin: '12' },
         ],
