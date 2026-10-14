@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { CameraScanner } from '@/components/scan/CameraScanner';
+import { InstallPrompt } from '@/components/scan/InstallPrompt';
 import { LookupPanel } from '@/components/scan/LookupPanel';
 import { api, ApiError, setCsrfToken } from '@/lib/api';
 import { primeAudio, signal, type Signal } from '@/lib/feedback';
@@ -568,6 +569,8 @@ export default function ScanPage() {
           )}
           {listNote && <p className="mt-2 text-amber-200">{listNote}</p>}
         </div>
+
+        <InstallPrompt />
 
         <p className="text-center text-xs text-slate-400">
           Green: let them in. Red or amber: do not admit. Each pass admits one person, once.

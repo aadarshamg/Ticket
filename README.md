@@ -229,6 +229,12 @@ How it is kept safe:
 
 The camera needs **https** (or `localhost`), so on real phones the site must be deployed.
 
+**Install it like an app.** On Android (Chrome) the scanner offers an **Install app** button;
+on iPhone, tap **Share → Add to Home Screen**. It then has its own icon and opens full screen,
+with no address bar. It is still the same web page, so updates reach every phone by themselves
+and there is no APK to send round. If you do want an APK file, generate one from the deployed
+scanner address with [PWABuilder](https://www.pwabuilder.com/) (free).
+
 ### Scanning without a connection
 
 Venue networks fail. The scanner is built to keep admitting people when they do.

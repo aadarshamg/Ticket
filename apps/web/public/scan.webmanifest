@@ -1,0 +1,17 @@
+{
+  "name": "Gate Scanner",
+  "short_name": "Scanner",
+  "description": "Scan entry passes at the gate.",
+  "id": "/scan",
+  "start_url": "/scan",
+  "scope": "/scan",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "/scanner-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/scanner-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/scanner-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
