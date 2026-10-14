@@ -10,12 +10,12 @@ import type { SettingsResponse, Stats } from '@/lib/types';
 const REFRESH_MS = 5000;
 const n = (value: number) => value.toLocaleString('en-IN');
 
-function Tile({ label, value, tone = 'text-slate-900', hint }: { label: string; value: number; tone?: string; hint?: string }) {
+function Tile({ label, value, tone = 'text-zinc-900', hint }: { label: string; value: number; tone?: string; hint?: string }) {
   return (
     <div className="card p-3 sm:p-4">
-      <dt className="text-xs text-slate-500">{label}</dt>
+      <dt className="text-xs text-zinc-500">{label}</dt>
       <dd className={`text-2xl font-semibold ${tone}`}>{n(value)}</dd>
-      {hint && <dd className="mt-0.5 text-xs text-slate-500">{hint}</dd>}
+      {hint && <dd className="mt-0.5 text-xs text-zinc-500">{hint}</dd>}
     </div>
   );
 }
@@ -69,7 +69,7 @@ export default function OverviewPage() {
         <div className="min-w-0">
           <h1 className="truncate text-xl font-semibold">{event ? event.name : `Welcome, ${admin.name}`}</h1>
           {event && (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-zinc-600">
               {event.venue}, {event.city} · starts {formatIst(event.startsAt)} IST
             </p>
           )}
@@ -89,7 +89,7 @@ export default function OverviewPage() {
       {settings && !event && (
         <div className="card">
           <h2 className="font-semibold">Set up your event</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-zinc-600">
             Add the event name, venue, timings and entry gates before uploading bookings.
           </p>
           <Link href="/admin/settings" className="btn-primary mt-4">
@@ -108,29 +108,29 @@ export default function OverviewPage() {
         </p>
       )}
 
-      {!stats && !error && <p className="text-sm text-slate-500">Loading the numbers…</p>}
+      {!stats && !error && <p className="text-sm text-zinc-500">Loading the numbers…</p>}
 
       {stats && (
         <>
           <section className="card space-y-3" aria-label="Entry">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-semibold">At the gates</h2>
-              <p className="text-xs text-slate-500" aria-live="off">
+              <p className="text-xs text-zinc-500" aria-live="off">
                 Updated {formatIstTime(stats.generatedAt)} · refreshes every 5 seconds
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
               <p>
                 <span className="text-4xl font-bold text-emerald-700">{n(stats.entered)}</span>
-                <span className="ml-2 text-sm text-slate-600">people entered</span>
+                <span className="ml-2 text-sm text-zinc-600">people entered</span>
               </p>
               <p>
-                <span className="text-4xl font-bold text-slate-900">{n(stats.stillToCome)}</span>
-                <span className="ml-2 text-sm text-slate-600">still to come</span>
+                <span className="text-4xl font-bold text-zinc-900">{n(stats.stillToCome)}</span>
+                <span className="ml-2 text-sm text-zinc-600">still to come</span>
               </p>
             </div>
             <div
-              className="h-3 overflow-hidden rounded-full bg-slate-200"
+              className="h-3 overflow-hidden rounded-full bg-zinc-200"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={expected}
@@ -139,7 +139,7 @@ export default function OverviewPage() {
             >
               <div className="h-full bg-emerald-600" style={{ width: `${share}%` }} />
             </div>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-zinc-600">
               {share}% of {n(expected)} expected
             </p>
 
@@ -149,19 +149,19 @@ export default function OverviewPage() {
                   <li key={gate.gate} className="text-sm">
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="font-medium">{gate.gate}</span>
-                      <span className="text-slate-600">
+                      <span className="text-zinc-600">
                         {n(gate.entered)} entered
                         {gate.lastEntryAt ? ` · last at ${formatIstTime(gate.lastEntryAt)}` : ''}
                       </span>
                     </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full bg-indigo-500" style={{ width: `${busiest > 0 ? (gate.entered / busiest) * 100 : 0}%` }} />
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
+                      <div className="h-full bg-zinc-800" style={{ width: `${busiest > 0 ? (gate.entered / busiest) * 100 : 0}%` }} />
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-            {stats.gates.length === 0 && <p className="text-sm text-slate-500">Nobody has been scanned in yet.</p>}
+            {stats.gates.length === 0 && <p className="text-sm text-zinc-500">Nobody has been scanned in yet.</p>}
 
             {stats.conflicts > 0 && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -179,14 +179,14 @@ export default function OverviewPage() {
               <Tile label="Bookings" value={stats.bookings.active} hint={stats.bookings.cancelled > 0 ? `${n(stats.bookings.cancelled)} cancelled` : undefined} />
               <Tile label="Passes issued" value={stats.passes.valid + stats.passes.used} />
               <Tile label="Passes used" value={stats.passes.used} tone="text-emerald-700" />
-              <Tile label="Passes cancelled" value={stats.passes.cancelled} tone={stats.passes.cancelled > 0 ? 'text-amber-700' : 'text-slate-900'} />
+              <Tile label="Passes cancelled" value={stats.passes.cancelled} tone={stats.passes.cancelled > 0 ? 'text-amber-700' : 'text-zinc-900'} />
             </dl>
           </section>
 
           <section aria-label="WhatsApp messages">
             <div className="mb-2 flex items-baseline justify-between gap-3">
               <h2 className="font-semibold">WhatsApp messages</h2>
-              <Link href="/admin/send" className="text-sm font-medium text-indigo-700 hover:underline">
+              <Link href="/admin/send" className="text-sm font-medium text-zinc-900 hover:underline">
                 Open Send
               </Link>
             </div>
@@ -196,9 +196,9 @@ export default function OverviewPage() {
               <Tile label="Sent" value={stats.messages.sent} tone="text-sky-700" />
               <Tile label="Delivered" value={stats.messages.delivered} tone="text-emerald-700" />
               <Tile label="Read" value={stats.messages.read} tone="text-emerald-700" />
-              <Tile label="Failed" value={stats.messages.failed} tone={stats.messages.failed > 0 ? 'text-red-700' : 'text-slate-900'} />
+              <Tile label="Failed" value={stats.messages.failed} tone={stats.messages.failed > 0 ? 'text-red-700' : 'text-zinc-900'} />
             </dl>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-zinc-500">
               Each booking is counted once, at its latest status: a message that has been read is under Read, not Delivered.
             </p>
           </section>

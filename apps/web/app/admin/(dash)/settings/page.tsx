@@ -139,7 +139,7 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-slate-500">Loading settings…</p>;
+    return <p className="text-sm text-zinc-500">Loading settings…</p>;
   }
 
   const inputClass = (path: string) => `input ${errors[path] ? 'input-error' : ''}`;
@@ -190,7 +190,7 @@ export default function SettingsPage() {
       <section className="card space-y-4">
         <div>
           <h2 className="font-semibold">Timing</h2>
-          <p className="text-sm text-slate-500">India Standard Time (IST).</p>
+          <p className="text-sm text-zinc-500">India Standard Time (IST).</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Gates open" htmlFor="gatesOpenAt" error={errors.gatesOpenAt}>
@@ -220,7 +220,7 @@ export default function SettingsPage() {
           <Field label="Brand colour" htmlFor="brandColour" error={errors.brandColour}>
             <div className="flex items-center gap-2">
               <input type="color" aria-label="Pick brand colour"
-                className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-zinc-300 bg-white p-1"
                 value={/^#[0-9a-fA-F]{6}$/.test(form.brandColour) ? form.brandColour : '#4f46e5'}
                 onChange={(e) => set('brandColour', e.target.value)} />
               <input id="brandColour" className={inputClass('brandColour')} value={form.brandColour}
@@ -250,18 +250,18 @@ export default function SettingsPage() {
       <section className="card space-y-4">
         <div>
           <h2 className="font-semibold">Entry gates</h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-zinc-500">
             Volunteers open the scanner page (this site&apos;s address followed by <code>/scan</code>) on their
             phone and sign in with a gate&apos;s PIN (6 to 8 digits). PINs are stored
             hashed and cannot be viewed later, so note each one when you set it.
           </p>
         </div>
 
-        {gates.length === 0 && <p className="text-sm text-slate-500">No gates yet.</p>}
+        {gates.length === 0 && <p className="text-sm text-zinc-500">No gates yet.</p>}
 
         <ul className="space-y-3">
           {gates.map((gate, index) => (
-            <li key={gate.key} className="rounded-lg border border-slate-200 p-3">
+            <li key={gate.key} className="rounded-lg border border-zinc-200 p-3">
               <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
                 <Field label="Gate name" htmlFor={`gate-name-${gate.key}`} error={errors[`gates.${index}.name`]}>
                   <input id={`gate-name-${gate.key}`} className={inputClass(`gates.${index}.name`)}
@@ -277,8 +277,8 @@ export default function SettingsPage() {
                     onChange={(e) => setGate(gate.key, { pin: e.target.value.replace(/\D/g, '') })} />
                 </Field>
                 <div className="flex items-center gap-3 sm:pt-7">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" className="h-4 w-4 accent-indigo-600"
+                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                    <input type="checkbox" className="h-4 w-4 accent-zinc-900"
                       checked={gate.active} onChange={(e) => setGate(gate.key, { active: e.target.checked })} />
                     Active
                   </label>
@@ -297,7 +297,7 @@ export default function SettingsPage() {
           <button type="button" className="btn-secondary" onClick={addGate}>
             Add gate
           </button>
-          <span className="text-xs text-slate-500">Gate changes, including removals, apply when you save.</span>
+          <span className="text-xs text-zinc-500">Gate changes, including removals, apply when you save.</span>
         </div>
       </section>
 

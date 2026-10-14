@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatIstTime } from '@/lib/ist';
 import type { PublicEvent } from '@/lib/server/passApi';
 
@@ -5,51 +6,71 @@ import type { PublicEvent } from '@/lib/server/passApi';
 export function EventInfo({ event, shareHint }: { event: PublicEvent; shareHint: boolean }) {
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl bg-white p-5 shadow-sm group-data-[over=true]/page:hidden">
-        <h2 className="font-semibold text-slate-900">At the gate</h2>
-        <p className="mt-2 text-sm text-slate-700">
-          Gates open at <strong>{formatIstTime(event.gatesOpenAt)}</strong>. The event starts at{' '}
-          <strong>{formatIstTime(event.startsAt)}</strong>.
-        </p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-          <li>Show the QR code on your phone at the entry gate.</li>
-          <li>Each pass admits one person, once.</li>
-          <li>Turn your screen brightness up so the code scans quickly.</li>
-          {shareHint && <li>Coming separately? Use “Share this pass” to send each person their own pass.</li>}
-          <li>This page keeps working without internet once you have opened it.</li>
+      <section className="rounded-3xl bg-white p-6 group-data-[over=true]/page:hidden">
+        <dl className="grid grid-cols-2 divide-x divide-zinc-100 text-center">
+          <div>
+            <dt className="text-xs text-zinc-500">Gates open</dt>
+            <dd className="mt-1 text-2xl font-semibold tabular-nums">{formatIstTime(event.gatesOpenAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-zinc-500">Event starts</dt>
+            <dd className="mt-1 text-2xl font-semibold tabular-nums">{formatIstTime(event.startsAt)}</dd>
+          </div>
+        </dl>
+        <ul className="mt-6 space-y-3 border-t border-zinc-100 pt-5 text-sm text-zinc-600">
+          <Tip>Show the QR code on your phone at the entry gate. Each pass admits one person, once.</Tip>
+          <Tip>Turn your screen brightness up so the code scans quickly.</Tip>
+          {shareHint && <Tip>Coming separately? Use “Share this pass” to send each person their own pass.</Tip>}
+          <Tip>This page keeps working without internet once you have opened it.</Tip>
         </ul>
       </section>
 
       {event.helplineNumber && (
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Need help?</h2>
-          <p className="mt-2 text-sm text-slate-700">
-            Call the helpline:{' '}
-            <a href={`tel:${event.helplineNumber.replace(/[^\d+]/g, '')}`} className="font-semibold text-indigo-700 underline">
-              {event.helplineNumber}
-            </a>
-          </p>
-        </section>
+        <a
+          href={`tel:${event.helplineNumber.replace(/[^\d+]/g, '')}`}
+          className="flex items-center justify-between gap-3 rounded-3xl bg-white px-6 py-4 transition hover:bg-zinc-50"
+        >
+          <span>
+            <span className="block text-xs text-zinc-500">Need help?</span>
+            <span className="block text-sm font-semibold text-zinc-900">{event.helplineNumber}</span>
+          </span>
+          <span className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white">Call</span>
+        </a>
       )}
 
       {event.termsText && (
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-slate-900">Terms</h2>
-          <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-slate-600">{event.termsText}</p>
+        <section className="px-2">
+          <h2 className="text-xs font-semibold text-zinc-500">Terms</h2>
+          <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-zinc-400">{event.termsText}</p>
         </section>
       )}
 
-      <p className="pb-6 text-center text-xs text-slate-500">{event.organiserName}</p>
+      <p className="pb-8 pt-2 text-center text-xs text-zinc-400">{event.organiserName}</p>
     </div>
+  );
+}
+
+function Tip({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" fill="currentColor" aria-hidden="true">
+        <path
+          fillRule="evenodd"
+          d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span>{children}</span>
+    </li>
   );
 }
 
 /** Shown in place of the QR codes once the event has ended. */
 export function EventOverBanner() {
   return (
-    <div className="hidden rounded-2xl bg-white p-5 text-center shadow-md group-data-[over=true]/page:block" role="status">
-      <p className="text-lg font-bold text-slate-900">Event over</p>
-      <p className="mt-1 text-sm text-slate-600">This event has ended. Thank you for coming.</p>
+    <div className="hidden rounded-3xl bg-white p-6 text-center group-data-[over=true]/page:block" role="status">
+      <p className="text-lg font-semibold text-zinc-900">Event over</p>
+      <p className="mt-1 text-sm text-zinc-500">This event has ended. Thank you for coming.</p>
     </div>
   );
 }

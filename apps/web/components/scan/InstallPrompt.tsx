@@ -62,7 +62,7 @@ export function InstallPrompt() {
   };
 
   return (
-    <div className="rounded-xl bg-indigo-950 p-3 text-sm text-indigo-100" data-testid="install-prompt">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300" data-testid="install-prompt">
       {installEvent ? (
         <p>Put the scanner on this phone&apos;s home screen, so it opens full screen like an app.</p>
       ) : (
@@ -75,7 +75,7 @@ export function InstallPrompt() {
         {installEvent && (
           <button
             type="button"
-            className="rounded-lg bg-indigo-500 px-3 py-1.5 font-semibold text-white"
+            className="rounded-full bg-white px-3 py-1.5 font-semibold text-zinc-950"
             onClick={async () => {
               await installEvent.prompt();
               const { outcome } = await installEvent.userChoice;
@@ -86,7 +86,7 @@ export function InstallPrompt() {
             Install app
           </button>
         )}
-        <button type="button" className="rounded-lg px-3 py-1.5 font-semibold text-indigo-200" onClick={dismiss}>
+        <button type="button" className="rounded-lg px-3 py-1.5 font-semibold text-zinc-300" onClick={dismiss}>
           Not now
         </button>
       </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
+import { BrandMark } from '@/components/AdminShell';
 import { Field } from '@/components/Field';
 import { api, ApiError, setCsrfToken } from '@/lib/api';
 import type { SessionResponse } from '@/lib/types';
@@ -39,10 +40,15 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-4" noValidate>
-        <div>
-          <h1 className="text-xl font-semibold">Organiser sign in</h1>
-          <p className="mt-1 text-sm text-slate-500">Event Passes admin dashboard</p>
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5" noValidate>
+        <div className="space-y-4 text-center">
+          <span className="inline-flex">
+            <BrandMark />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold">Welcome back</h1>
+            <p className="mt-1 text-sm text-zinc-500">Sign in to manage your event</p>
+          </div>
         </div>
 
         {error && (
@@ -76,7 +82,7 @@ export default function LoginPage() {
           />
         </Field>
 
-        <button type="submit" className="btn-primary w-full" disabled={busy || !email || !password}>
+        <button type="submit" className="btn-primary w-full py-2.5" disabled={busy || !email || !password}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

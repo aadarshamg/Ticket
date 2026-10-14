@@ -78,7 +78,7 @@ function EditForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (b:
 
   return (
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
-      <p className="text-sm text-slate-500">Order {booking.orderId}</p>
+      <p className="text-sm text-zinc-500">Order {booking.orderId}</p>
       {message && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
           {message}
@@ -133,7 +133,7 @@ function StatusForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-700">
+      <p className="text-sm text-zinc-700">
         {cancelling
           ? `${booking.name} (order ${booking.orderId}): ${unused} unused ${unused === 1 ? 'pass' : 'passes'} will stop working at the gate.`
           : `${booking.name} (order ${booking.orderId}): the cancelled passes will work at the gate again.`}
@@ -177,12 +177,12 @@ function SendForm({ booking, onDone, onCancel }: { booking: Booking; onDone: () 
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-700">
+      <p className="text-sm text-zinc-700">
         {again ? 'Send the pass message again' : 'Send the pass message'} to {booking.name} at {booking.phone} (order{' '}
         {booking.orderId}).
       </p>
       {booking.messageError && (
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">Last attempt failed: {booking.messageError}</p>
+        <p className="rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-700">Last attempt failed: {booking.messageError}</p>
       )}
       {message && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
@@ -293,12 +293,12 @@ export default function BookingsPage() {
 
       <div className="card grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2 lg:col-span-1">
-          <label htmlFor="search" className="mb-1 block text-sm font-medium text-slate-700">Search</label>
+          <label htmlFor="search" className="mb-1 block text-sm font-medium text-zinc-700">Search</label>
           <input id="search" type="search" className="input" placeholder="Name, order ID, phone or email"
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div>
-          <label htmlFor="f-message" className="mb-1 block text-sm font-medium text-slate-700">WhatsApp message</label>
+          <label htmlFor="f-message" className="mb-1 block text-sm font-medium text-zinc-700">WhatsApp message</label>
           <select id="f-message" className="input" value={messageStatus}
             onChange={(e) => { setMessageStatus(e.target.value as MessageStatus | ''); setPage(1); }}>
             <option value="">Any</option>
@@ -308,7 +308,7 @@ export default function BookingsPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="f-entry" className="mb-1 block text-sm font-medium text-slate-700">Entry</label>
+          <label htmlFor="f-entry" className="mb-1 block text-sm font-medium text-zinc-700">Entry</label>
           <select id="f-entry" className="input" value={entryStatus}
             onChange={(e) => { setEntryStatus(e.target.value as EntryStatus | ''); setPage(1); }}>
             <option value="">Any</option>
@@ -318,7 +318,7 @@ export default function BookingsPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="f-status" className="mb-1 block text-sm font-medium text-slate-700">Booking</label>
+          <label htmlFor="f-status" className="mb-1 block text-sm font-medium text-zinc-700">Booking</label>
           <select id="f-status" className="input" value={status}
             onChange={(e) => { setStatus(e.target.value as BookingStatus | ''); setPage(1); }}>
             <option value="">Any</option>
@@ -332,12 +332,12 @@ export default function BookingsPage() {
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>
       )}
 
-      <p className="text-sm text-slate-600" aria-live="polite">
+      <p className="text-sm text-zinc-600" aria-live="polite">
         {loading && !data ? 'Loading…' : `Showing ${first.toLocaleString('en-IN')}–${last.toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}`}
       </p>
 
       {data && items.length === 0 && (
-        <div className="card text-sm text-slate-600">No bookings match. Try a different search or filter.</div>
+        <div className="card text-sm text-zinc-600">No bookings match. Try a different search or filter.</div>
       )}
 
       {/* Phones: one card per booking */}
@@ -347,10 +347,10 @@ export default function BookingsPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-semibold">{booking.name}</p>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-zinc-500">
                   {booking.orderId}{booking.category ? ` · ${booking.category}` : ''} · {rupees(booking.amount)}
                 </p>
-                <p className="text-sm text-slate-700">{booking.phone}</p>
+                <p className="text-sm text-zinc-700">{booking.phone}</p>
               </div>
             </div>
             <StatusBadges booking={booking} />
@@ -363,7 +363,7 @@ export default function BookingsPage() {
       {items.length > 0 && (
         <div className={`card hidden overflow-x-auto p-0 md:block md:p-0 ${loading ? 'opacity-60' : ''}`}>
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase text-zinc-500">
               <tr>
                 <th className="px-4 py-2">Order ID</th>
                 <th className="px-2 py-2">Name</th>
@@ -373,13 +373,13 @@ export default function BookingsPage() {
                 <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-100">
               {items.map((booking) => (
-                <tr key={booking.id} className={booking.status === 'cancelled' ? 'text-slate-400' : ''}>
+                <tr key={booking.id} className={booking.status === 'cancelled' ? 'text-zinc-400' : ''}>
                   <td className="whitespace-nowrap px-4 py-2 font-medium">{booking.orderId}</td>
                   <td className="px-2 py-2">
                     <div className="max-w-[16rem] truncate">{booking.name}</div>
-                    {booking.category && <div className="text-xs text-slate-500">{booking.category}</div>}
+                    {booking.category && <div className="text-xs text-zinc-500">{booking.category}</div>}
                   </td>
                   <td className="whitespace-nowrap px-2 py-2">{booking.phone}</td>
                   <td className="whitespace-nowrap px-2 py-2">{rupees(booking.amount)}</td>
@@ -393,7 +393,7 @@ export default function BookingsPage() {
       )}
 
       {pageCount > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+        <div className="flex items-center justify-between gap-3 text-sm text-zinc-600">
           <span>Page {page} of {pageCount.toLocaleString('en-IN')}</span>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-secondary px-3 py-1.5" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>

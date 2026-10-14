@@ -14,7 +14,7 @@ type Confirm =
   | { kind: 'reminder'; count: number };
 
 const COUNT_TILES: { key: keyof SendStatus['counts']; label: string; className: string }[] = [
-  { key: 'unsent', label: 'Not sent yet', className: 'text-slate-900' },
+  { key: 'unsent', label: 'Not sent yet', className: 'text-zinc-900' },
   { key: 'queued', label: 'Waiting to send', className: 'text-amber-700' },
   { key: 'sent', label: 'Sent', className: 'text-sky-700' },
   { key: 'delivered', label: 'Delivered', className: 'text-emerald-700' },
@@ -96,7 +96,7 @@ export default function SendPage() {
   }
 
   if (!status) {
-    return <p className="text-sm text-slate-500">{loadError ?? 'Loading…'}</p>;
+    return <p className="text-sm text-zinc-500">{loadError ?? 'Loading…'}</p>;
   }
 
   const { counts, queue: run_ } = status;
@@ -135,7 +135,7 @@ export default function SendPage() {
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {COUNT_TILES.map((tile) => (
           <div key={tile.key} className="card p-3 sm:p-4">
-            <dt className="text-xs text-slate-500">{tile.label}</dt>
+            <dt className="text-xs text-zinc-500">{tile.label}</dt>
             <dd className={`text-2xl font-semibold ${tile.className}`}>{n(counts[tile.key])}</dd>
           </div>
         ))}
@@ -158,7 +158,7 @@ export default function SendPage() {
             )}
           </div>
           <div
-            className="h-3 overflow-hidden rounded-full bg-slate-200"
+            className="h-3 overflow-hidden rounded-full bg-zinc-200"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={run_.total}
@@ -166,11 +166,11 @@ export default function SendPage() {
             aria-label="Messages processed"
           >
             <div
-              className={`h-full ${run_.paused ? 'bg-amber-500' : 'bg-indigo-600'}`}
+              className={`h-full ${run_.paused ? 'bg-amber-500' : 'bg-zinc-900'}`}
               style={{ width: `${run_.total > 0 ? Math.min(100, (done / run_.total) * 100) : 0}%` }}
             />
           </div>
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-zinc-700">
             {n(done)} of {n(run_.total)} done · {n(run_.pending)} waiting
             {run_.failed > 0 && <span className="font-medium text-red-700"> · {n(run_.failed)} failed</span>}
           </p>
@@ -186,14 +186,14 @@ export default function SendPage() {
 
       <section className="card space-y-3">
         <h2 className="font-semibold">Send passes</h2>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-zinc-700">
           {counts.unsent === 0
             ? 'Every active booking has already been sent its passes.'
             : `${bookings(counts.unsent)} ${counts.unsent === 1 ? 'has' : 'have'} not been sent passes yet. Bookings already sent are never sent again from here.`}
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label htmlFor="howMany" className="mb-1 block text-sm font-medium text-slate-700">How many to send now</label>
+            <label htmlFor="howMany" className="mb-1 block text-sm font-medium text-zinc-700">How many to send now</label>
             <input id="howMany" type="number" inputMode="numeric" min={1} className={`input w-40 ${limitValid ? '' : 'input-error'}`}
               placeholder={`All ${n(counts.unsent)}`} value={howMany} onChange={(e) => setHowMany(e.target.value)} />
           </div>
@@ -202,7 +202,7 @@ export default function SendPage() {
             Send to {bookings(toSend)}
           </button>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-zinc-500">
           Leave the box empty to send to all of them. Oldest bookings go first. Start with a small number, check
           that those arrive, then send the rest.
         </p>
@@ -210,7 +210,7 @@ export default function SendPage() {
 
       <section className="card space-y-3">
         <h2 className="font-semibold">Failed messages</h2>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-zinc-700">
           {counts.failed === 0
             ? 'No failed messages.'
             : `${bookings(counts.failed)} could not be sent. In Bookings, filter WhatsApp message to “Failed” to see why, correct any wrong phone numbers, then resend.`}
@@ -223,11 +223,11 @@ export default function SendPage() {
 
       <section className="card space-y-3">
         <h2 className="font-semibold">Test message</h2>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-zinc-700">
           Send the first booking&apos;s real message to your own team to check how it looks. The booking is not
           marked as sent.
         </p>
-        <label htmlFor="testNumbers" className="block text-sm font-medium text-slate-700">Team phone numbers (up to 10, one per line)</label>
+        <label htmlFor="testNumbers" className="block text-sm font-medium text-zinc-700">Team phone numbers (up to 10, one per line)</label>
         <textarea id="testNumbers" rows={3} className="input" placeholder={'9876543210\n9876543211'}
           value={testNumbers} onChange={(e) => setTestNumbers(e.target.value)} />
         <button type="button" className="btn-secondary" disabled={!status.sender || testing || testNumbers.trim() === ''} onClick={sendTest}>
@@ -247,7 +247,7 @@ export default function SendPage() {
 
       <section className="card space-y-3">
         <h2 className="font-semibold">Reminder</h2>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-zinc-700">
           {bookings(status.reminderCandidates)} still {status.reminderCandidates === 1 ? 'has' : 'have'} unused passes.
           A reminder uses the separate template <code className="text-xs">event_reminder_v1</code>, which Meta must
           approve first.
@@ -261,7 +261,7 @@ export default function SendPage() {
       <Dialog open={confirm !== null} onClose={() => setConfirm(null)} title="Send WhatsApp messages?">
         {confirm && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-zinc-700">
               {confirm.kind === 'unsent' && `${bookings(confirm.count)} will each receive their passes on WhatsApp.`}
               {confirm.kind === 'failed' && `The message will be sent again to ${bookings(confirm.count)} whose message failed.`}
               {confirm.kind === 'reminder' && `A reminder will be sent to ${bookings(confirm.count)} with unused passes.`}

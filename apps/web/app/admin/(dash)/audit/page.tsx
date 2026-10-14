@@ -115,14 +115,14 @@ export default function AuditPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Activity log</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-zinc-600">
           Every change made in the system: who did it, what, and when. Newest first. Entries cannot be edited.
         </p>
       </div>
 
       <div className="card grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="group" className="mb-1 block text-sm font-medium text-slate-700">Show</label>
+          <label htmlFor="group" className="mb-1 block text-sm font-medium text-zinc-700">Show</label>
           <select id="group" className="input" value={group} onChange={(e) => { setGroup(e.target.value); setPage(1); }}>
             {GROUPS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
@@ -130,7 +130,7 @@ export default function AuditPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="who" className="mb-1 block text-sm font-medium text-slate-700">Done by</label>
+          <label htmlFor="who" className="mb-1 block text-sm font-medium text-zinc-700">Done by</label>
           <input id="who" type="search" className="input" placeholder="Admin email or gate name" value={search}
             onChange={(e) => setSearch(e.target.value)} />
         </div>
@@ -140,11 +140,11 @@ export default function AuditPage() {
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>
       )}
 
-      <p className="text-sm text-slate-600" aria-live="polite">
+      <p className="text-sm text-zinc-600" aria-live="polite">
         {loading && !data ? 'Loading…' : `${total.toLocaleString('en-IN')} ${total === 1 ? 'entry' : 'entries'}`}
       </p>
 
-      {data && items.length === 0 && <div className="card text-sm text-slate-600">Nothing matches.</div>}
+      {data && items.length === 0 && <div className="card text-sm text-zinc-600">Nothing matches.</div>}
 
       <ul className={`space-y-2 ${loading ? 'opacity-60' : ''}`}>
         {items.map((entry) => {
@@ -154,20 +154,20 @@ export default function AuditPage() {
             <li key={entry.id} className="card p-3 sm:p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <p className="font-medium">{ACTIONS[entry.action] ?? entry.action}</p>
-                <time className="text-xs text-slate-500" dateTime={entry.createdAt}>{formatIst(entry.createdAt)} IST</time>
+                <time className="text-xs text-zinc-500" dateTime={entry.createdAt}>{formatIst(entry.createdAt)} IST</time>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-700">
                 <Badge tone={who.tone}>{who.label}</Badge>
                 <span className="break-all">{entry.actorLabel}</span>
               </div>
-              {more && <p className="mt-1 break-words text-xs text-slate-500">{more}</p>}
+              {more && <p className="mt-1 break-words text-xs text-zinc-500">{more}</p>}
             </li>
           );
         })}
       </ul>
 
       {pageCount > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+        <div className="flex items-center justify-between gap-3 text-sm text-zinc-600">
           <span>Page {page} of {pageCount.toLocaleString('en-IN')}</span>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary px-3 py-1.5" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>

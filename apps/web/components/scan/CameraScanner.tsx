@@ -94,14 +94,14 @@ export function CameraScanner({ onScan, onReady }: Props) {
   return (
     <div className="relative mx-auto w-full max-w-md">
       <div id={READER_ID} className="overflow-hidden rounded-2xl bg-black [&_video]:block [&_video]:w-full" />
-      {starting && !error && <p className="py-10 text-center text-sm text-slate-300">Starting the camera…</p>}
+      {starting && !error && <p className="py-10 text-center text-sm text-zinc-300">Starting the camera…</p>}
       {error && (
-        <div className="rounded-2xl bg-slate-800 p-4 text-center" role="alert">
+        <div className="rounded-2xl bg-zinc-800 p-4 text-center" role="alert">
           <p className="text-sm text-amber-200">{error}</p>
           <button
             type="button"
             onClick={() => setAttempt((value) => value + 1)}
-            className="mt-3 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white"
+            className="mt-3 rounded-lg bg-zinc-600 px-4 py-2 text-sm font-semibold text-white"
           >
             Try the camera again
           </button>

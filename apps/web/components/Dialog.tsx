@@ -24,7 +24,7 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
     <dialog
       ref={ref}
       onClose={onClose}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 text-zinc-900 shadow-xl backdrop:bg-zinc-900/50"
     >
       {open && (
         <div className="p-5">

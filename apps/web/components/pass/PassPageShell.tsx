@@ -53,7 +53,7 @@ export function PassPageShell({ endsAt, initialOver, children }: Props) {
   }, []);
 
   return (
-    <div className="group/page min-h-screen bg-slate-100" data-over={over ? 'true' : 'false'}>
+    <div className="group/page min-h-screen bg-zinc-100" data-over={over ? 'true' : 'false'}>
       {children}
     </div>
   );

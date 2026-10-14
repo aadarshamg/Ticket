@@ -95,23 +95,23 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-20 overflow-y-auto bg-slate-900 p-4 text-white">
+    <div className="fixed inset-0 z-20 overflow-y-auto bg-zinc-950 p-4 text-white">
       <div className="mx-auto max-w-md space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Find a booking</h2>
-          <button type="button" onClick={onClose} className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold">
+          <button type="button" onClick={onClose} className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-semibold">
             Back to camera
           </button>
         </div>
 
         <form onSubmit={search} className="space-y-2">
-          <label htmlFor="lookup" className="block text-sm text-slate-300">
+          <label htmlFor="lookup" className="block text-sm text-zinc-300">
             Order ID, or the last 4 digits of the buyer&apos;s phone number
           </label>
           <div className="flex gap-2">
             <input
               id="lookup"
-              className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-3 text-lg text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-3 text-lg text-white placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
               placeholder="ORD-1001 or 3210"
               autoComplete="off"
               autoCapitalize="characters"
@@ -122,7 +122,7 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
             <button
               type="submit"
               disabled={busy || query.trim().length < 3}
-              className="rounded-lg bg-indigo-500 px-4 py-3 font-semibold disabled:opacity-50"
+              className="rounded-lg bg-white px-4 py-3 font-semibold text-zinc-950 disabled:opacity-40"
             >
               Search
             </button>
@@ -139,25 +139,25 @@ export function LookupPanel({ onClose, onSessionEnded }: Props) {
         )}
 
         {results && results.length === 0 && (
-          <p className="rounded-lg bg-slate-800 p-4 text-sm text-slate-300">
+          <p className="rounded-lg bg-zinc-800 p-4 text-sm text-zinc-300">
             No booking matches. Check the order ID is typed exactly, or try the last 4 digits of the phone number.
           </p>
         )}
 
         <ul className="space-y-3">
           {(results ?? []).map((row) => (
-            <li key={row.ticketId} className="rounded-xl bg-slate-800 p-4">
+            <li key={row.ticketId} className="rounded-xl bg-zinc-800 p-4">
               <p className="text-lg font-semibold">{row.name}</p>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-zinc-300">
                 {row.category ? `${row.category} · ` : ''}
                 {row.entered} of {row.passCount} entered
               </p>
               {row.cancelled ? (
-                <p className="mt-2 inline-block rounded-full bg-amber-500 px-3 py-1 text-sm font-semibold text-slate-900">
+                <p className="mt-2 inline-block rounded-full bg-amber-500 px-3 py-1 text-sm font-semibold text-zinc-900">
                   Cancelled
                 </p>
               ) : row.remaining === 0 ? (
-                <p className="mt-2 text-sm text-slate-400">Everyone has entered.</p>
+                <p className="mt-2 text-sm text-zinc-400">Everyone has entered.</p>
               ) : (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button

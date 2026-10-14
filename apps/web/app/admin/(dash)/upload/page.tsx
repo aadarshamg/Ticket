@@ -98,7 +98,7 @@ export default function UploadPage() {
         <h1 className="text-xl font-semibold">Upload bookings</h1>
         <div className="card space-y-3">
           <h2 className="font-semibold text-emerald-800">Bookings saved</h2>
-          <ul className="text-sm text-slate-700">
+          <ul className="text-sm text-zinc-700">
             <li>{plural(result.created, 'new booking')} created</li>
             <li>{plural(result.updated, 'booking')} updated</li>
             <li>{plural(result.unchanged, 'booking')} already up to date</li>
@@ -143,7 +143,7 @@ export default function UploadPage() {
         {errorBanner}
         <form onSubmit={checkFile} className="card space-y-4">
           <div>
-            <label htmlFor="file" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="file" className="mb-1 block text-sm font-medium text-zinc-700">
               Excel or CSV file
             </label>
             <input
@@ -151,32 +151,32 @@ export default function UploadPage() {
               id="file"
               type="file"
               accept=".xlsx,.xls,.csv"
-              className="block w-full text-sm text-slate-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+              className="block w-full text-sm text-zinc-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-900 hover:file:bg-zinc-200"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <p className="mt-1 text-xs text-slate-500">Up to 5 MB and 10,000 rows. Only the first sheet is read.</p>
+            <p className="mt-1 text-xs text-zinc-500">Up to 5 MB and 10,000 rows. Only the first sheet is read.</p>
           </div>
           <button type="submit" className="btn-primary" disabled={!file || busy !== null}>
             {busy === 'check' ? 'Checking…' : 'Check file'}
           </button>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-zinc-600">
             Nothing is saved at this step. You will see every row marked valid or invalid first.
           </p>
         </form>
 
-        <div className="card text-sm text-slate-700">
-          <h2 className="font-semibold text-slate-900">What the file needs</h2>
+        <div className="card text-sm text-zinc-700">
+          <h2 className="font-semibold text-zinc-900">What the file needs</h2>
           <p className="mt-1">The first row must be the column names. Capital letters and extra spaces are fine.</p>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left">
-              <thead className="text-xs uppercase text-slate-500">
+              <thead className="text-xs uppercase text-zinc-500">
                 <tr>
                   <th className="py-1 pr-4">Column</th>
                   <th className="py-1 pr-4">Required</th>
                   <th className="py-1">Rule</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-zinc-100">
                 {[
                   ['order_id', 'Yes', 'Unique. Uploading the same order ID again updates that booking.'],
                   ['name', 'Yes', '2 to 80 characters.'],
@@ -195,7 +195,7 @@ export default function UploadPage() {
               </tbody>
             </table>
           </div>
-          <a href="/sample-bookings.csv" download className="mt-3 inline-block font-medium text-indigo-700 hover:underline">
+          <a href="/sample-bookings.csv" download className="mt-3 inline-block font-medium text-zinc-900 hover:underline">
             Download a sample file
           </a>
         </div>
@@ -221,8 +221,8 @@ export default function UploadPage() {
       {errorBanner}
 
       <div className="card space-y-3">
-        <p className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{preview.upload.fileName}</span> ·{' '}
+        <p className="text-sm text-zinc-600">
+          <span className="font-medium text-zinc-900">{preview.upload.fileName}</span> ·{' '}
           {plural(preview.upload.rowCount, 'row')}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -232,13 +232,13 @@ export default function UploadPage() {
           <Badge tone={summary.invalid > 0 ? 'red' : 'slate'}>{summary.invalid.toLocaleString('en-IN')} invalid</Badge>
         </div>
         {summary.invalid > 0 && (
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-zinc-700">
             Invalid rows will be skipped. Fix them in your spreadsheet and upload it again; rows already saved
             are simply updated.
           </p>
         )}
         {preview.ignoredColumns.length > 0 && (
-          <p className="text-sm text-slate-500">Ignored columns: {preview.ignoredColumns.join(', ')}</p>
+          <p className="text-sm text-zinc-500">Ignored columns: {preview.ignoredColumns.join(', ')}</p>
         )}
         <button type="button" className="btn-primary" onClick={save} disabled={toSave === 0 || busy !== null}>
           {busy === 'save' ? 'Saving…' : toSave === 0 ? 'Nothing to save' : `Save ${plural(toSave, 'booking')}`}
@@ -258,7 +258,7 @@ export default function UploadPage() {
                 setPage(1);
               }}
               className={`cursor-pointer rounded-full px-3 py-1 text-sm font-medium ${
-                filter === item.key ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                filter === item.key ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
               }`}
             >
               {item.label} ({item.count.toLocaleString('en-IN')})
@@ -268,7 +268,7 @@ export default function UploadPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[56rem] text-left text-sm">
-            <thead className="border-y border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="border-y border-zinc-200 bg-zinc-50 text-xs uppercase text-zinc-500">
               <tr>
                 <th className="px-4 py-2">Row</th>
                 <th className="px-2 py-2">Result</th>
@@ -282,7 +282,7 @@ export default function UploadPage() {
                 <th className="px-4 py-2">Email</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-100">
               {visible.map((row) => {
                 const badge = row.valid && row.action ? ACTION_BADGE[row.action] : undefined;
                 // Valid rows show the cleaned-up values that will be saved; invalid rows show the file as-is.
@@ -299,11 +299,11 @@ export default function UploadPage() {
                   : [row.raw.order_id, row.raw.name, row.raw.phone, row.raw.passes, row.raw.amount, row.raw.category, row.raw.email];
                 return (
                   <tr key={row.row} className={row.valid ? '' : 'bg-red-50/40'}>
-                    <td className="px-4 py-2 text-slate-500">{row.row}</td>
+                    <td className="px-4 py-2 text-zinc-500">{row.row}</td>
                     <td className="px-2 py-2">
                       {badge ? <Badge tone={badge.tone}>{badge.label}</Badge> : <Badge tone="red">Invalid</Badge>}
                     </td>
-                    <td className={`px-2 py-2 ${row.valid ? 'text-slate-600' : 'font-medium text-red-700'}`}>
+                    <td className={`px-2 py-2 ${row.valid ? 'text-zinc-600' : 'font-medium text-red-700'}`}>
                       {rowDetails(row).map((line) => (
                         <div key={line}>{line}</div>
                       ))}
@@ -318,7 +318,7 @@ export default function UploadPage() {
               })}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={10} className="px-4 py-6 text-center text-zinc-500">
                     No rows to show.
                   </td>
                 </tr>
@@ -327,7 +327,7 @@ export default function UploadPage() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-4 pb-4 text-sm text-slate-600">
+        <div className="flex items-center justify-between gap-3 px-4 pb-4 text-sm text-zinc-600">
           <span>
             Page {page} of {pageCount}
           </span>

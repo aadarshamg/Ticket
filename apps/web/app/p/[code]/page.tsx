@@ -24,10 +24,13 @@ export default async function PassPage({ params }: { params: Promise<{ code: str
   return (
     <PassPageShell endsAt={event.endsAt} initialOver={event.over}>
       <EventHeader event={event} />
-      <main className="mx-auto -mt-6 max-w-md space-y-4 px-4">
+      <main className="mx-auto max-w-md space-y-4 px-4">
+        <div className="px-2 pb-2 text-center">
+          <h1 className="text-2xl font-semibold text-zinc-900">Your entry pass</h1>
+          {pass.category && <p className="mt-1 text-sm text-zinc-500">{pass.category}</p>}
+        </div>
         <EventOverBanner />
-        <PassCard pass={pass} passCount={pass.passCount} eventName={event.name} />
-        {pass.category && <p className="text-center text-sm text-slate-600">{pass.category}</p>}
+        <PassCard pass={pass} passCount={pass.passCount} event={event} />
         <EventInfo event={event} shareHint={false} />
       </main>
     </PassPageShell>

@@ -46,8 +46,8 @@ interface ResultView {
 const TONE_CLASS: Record<Tone, string> = {
   green: 'bg-emerald-600 text-white',
   red: 'bg-red-600 text-white',
-  amber: 'bg-amber-400 text-slate-900',
-  grey: 'bg-slate-600 text-white',
+  amber: 'bg-amber-400 text-zinc-900',
+  grey: 'bg-zinc-600 text-white',
 };
 const TONE_SIGNAL: Record<Tone, Signal> = { green: 'ok', red: 'error', amber: 'warn', grey: 'warn' };
 
@@ -460,20 +460,27 @@ export default function ScanPage() {
   }
 
   if (loading) {
-    return <main className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-300">Loading…</main>;
+    return <main className="flex min-h-screen items-center justify-center bg-zinc-950 text-sm text-zinc-500">Loading…</main>;
   }
 
   // --- PIN screen ----------------------------------------------------------
   if (!session) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-900 p-4">
-        <form onSubmit={signIn} className="w-full max-w-xs space-y-4 rounded-2xl bg-white p-6" noValidate>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Gate scanner</h1>
-            <p className="mt-1 text-sm text-slate-600">Enter the PIN for your gate.</p>
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6 text-white">
+        <form onSubmit={signIn} className="w-full max-w-xs space-y-6" noValidate>
+          <div className="space-y-4 text-center">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />
+              </svg>
+            </span>
+            <div>
+              <h1 className="text-2xl font-semibold">Gate scanner</h1>
+              <p className="mt-1 text-sm text-zinc-400">Enter the PIN for your gate.</p>
+            </div>
           </div>
           {pinError && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            <p className="rounded-xl bg-red-500/15 px-3 py-2 text-center text-sm text-red-300" role="alert">
               {pinError}
             </p>
           )}
@@ -486,13 +493,17 @@ export default function ScanPage() {
             autoComplete="off"
             pattern="\d*"
             maxLength={8}
-            className="input text-center text-2xl tracking-[0.4em]"
+            className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-center text-3xl font-semibold tracking-[0.5em] text-white placeholder:text-zinc-600 focus:border-white/40 focus:outline-none"
             placeholder="••••••"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             autoFocus
           />
-          <button type="submit" className="btn-primary w-full py-3 text-base" disabled={signingIn || pin.length < 4}>
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-white py-4 text-base font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-30"
+            disabled={signingIn || pin.length < 4}
+          >
             {signingIn ? 'Checking…' : 'Start scanning'}
           </button>
         </form>
@@ -503,20 +514,23 @@ export default function ScanPage() {
   // --- Scanner -------------------------------------------------------------
   const { list, pending, storageFailed } = offline;
   return (
-    <main className="min-h-screen bg-slate-900 text-white">
-      <header className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold">{session.gate}</p>
-          <p className="text-xs text-slate-400">{checking ? 'Checking…' : 'Point the camera at a pass'}</p>
+    <main className="min-h-screen bg-zinc-950 text-white">
+      <header className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${online ? 'bg-emerald-400' : 'bg-amber-400'}`} aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold">{session.gate}</p>
+            <p className="text-xs text-zinc-500">{checking ? 'Checking…' : 'Point the camera at a pass'}</p>
+          </div>
         </div>
-        <button type="button" onClick={signOut} className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold">
+        <button type="button" onClick={signOut} className="rounded-full bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/15">
           Sign out
         </button>
       </header>
 
       {!online && (
         <p className="mx-auto mb-3 max-w-md px-4" role="status">
-          <span className="block rounded-xl bg-amber-400 px-3 py-2 text-sm font-semibold text-slate-900">
+          <span className="block rounded-xl bg-amber-400 px-3 py-2 text-sm font-semibold text-zinc-900">
             {list
               ? 'No connection. Passes are being checked against the list saved on this phone.'
               : 'No connection, and no saved list on this phone. Passes cannot be checked until it is back.'}
@@ -536,14 +550,14 @@ export default function ScanPage() {
             busyRef.current = true; // no scanning while looking a booking up
             setLookupOpen(true);
           }}
-          className="w-full rounded-xl bg-slate-700 px-4 py-3 text-base font-semibold disabled:opacity-50"
+          className="w-full rounded-2xl bg-white px-4 py-3.5 text-base font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:bg-white/10 disabled:text-zinc-500"
         >
           {online ? 'Find booking (no QR)' : 'Find booking needs a connection'}
         </button>
 
-        <div className="rounded-xl bg-slate-800 p-3 text-sm" data-testid="offline-status">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm" data-testid="offline-status">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-slate-300">
+            <p className="text-xs text-zinc-400">
               {list
                 ? `Saved list: ${list.count.toLocaleString('en-IN')} valid passes, updated ${formatIstTime(list.generatedAt)}`
                 : 'No list saved on this phone yet'}
@@ -552,7 +566,7 @@ export default function ScanPage() {
               type="button"
               onClick={updateList}
               disabled={updatingList}
-              className="shrink-0 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+              className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/15 disabled:opacity-50"
             >
               {updatingList ? 'Updating…' : 'Update list'}
             </button>
@@ -572,7 +586,7 @@ export default function ScanPage() {
 
         <InstallPrompt />
 
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-zinc-500">
           Green: let them in. Red or amber: do not admit. Each pass admits one person, once.
         </p>
       </div>

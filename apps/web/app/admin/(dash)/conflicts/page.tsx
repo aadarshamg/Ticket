@@ -35,7 +35,7 @@ export default function ConflictsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Offline conflicts</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-zinc-600">
           When a gate has no internet, its scanner checks passes against a list saved on the phone and uploads
           the entries later. This page lists entries that turned out not to be valid once uploaded. These people
           did get in.
@@ -48,9 +48,9 @@ export default function ConflictsPage() {
         </p>
       )}
 
-      {conflicts === null && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {conflicts === null && !error && <p className="text-sm text-zinc-500">Loading…</p>}
       {conflicts && conflicts.length === 0 && (
-        <div className="card text-sm text-slate-600">No conflicts. Every offline entry so far was valid.</div>
+        <div className="card text-sm text-zinc-600">No conflicts. Every offline entry so far was valid.</div>
       )}
 
       <ul className="space-y-3">
@@ -66,18 +66,18 @@ export default function ConflictsPage() {
                 </p>
                 <Badge tone={kind.tone}>{kind.label}</Badge>
               </div>
-              <p className="text-sm text-slate-700">{kind.meaning}</p>
+              <p className="text-sm text-zinc-700">{kind.meaning}</p>
               <dl className="grid gap-2 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="text-slate-500">Let in offline at</dt>
+                  <dt className="text-zinc-500">Let in offline at</dt>
                   <dd className="font-medium">
                     {conflict.gate} · {formatIst(conflict.scannedAt)}
                   </dd>
-                  <dd className="text-xs text-slate-500">Phone {conflict.deviceId.slice(0, 8)}</dd>
+                  <dd className="text-xs text-zinc-500">Phone {conflict.deviceId.slice(0, 8)}</dd>
                 </div>
                 {conflict.result === 'already_used' && conflict.recordedEntry && (
                   <div>
-                    <dt className="text-slate-500">Other entry on this pass</dt>
+                    <dt className="text-zinc-500">Other entry on this pass</dt>
                     <dd className="font-medium">
                       {conflict.recordedEntry.gate ?? 'Unknown gate'} · {formatIst(conflict.recordedEntry.at)}
                     </dd>

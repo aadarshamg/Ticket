@@ -13,11 +13,11 @@ interface FieldProps {
 export function Field({ label, htmlFor, hint, error, className, children }: FieldProps) {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-slate-700">
+      <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-zinc-700">
         {label}
       </label>
       {children}
-      {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-zinc-500">{hint}</p>}
       {error && (
         <p className="mt-1 text-xs font-medium text-red-600" role="alert">
           {error}
