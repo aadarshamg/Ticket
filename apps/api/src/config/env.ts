@@ -31,8 +31,8 @@ const schema = z.object({
   /** How long a gate volunteer stays signed in to the scanner. */
   GATE_SESSION_HOURS: z.coerce.number().int().min(1).max(72).default(16),
 
-  /** mock = log only; cloud = Meta WhatsApp Cloud API. */
-  MESSAGE_SENDER: z.enum(['mock', 'cloud']).default('mock'),
+  /** mock = log only; cloud = Meta WhatsApp Cloud API; wasarathi = through the WaSarathi panel. */
+  MESSAGE_SENDER: z.enum(['mock', 'cloud', 'wasarathi']).default('mock'),
   SEND_RATE_PER_SECOND: z.coerce.number().int().min(1).max(80).default(20),
   /** First retry delay for temporary send errors; doubles each retry. */
   SEND_RETRY_BASE_MS: z.coerce.number().int().min(1).default(2000),
@@ -55,6 +55,10 @@ const schema = z.object({
   WA_ACCESS_TOKEN: z.string().optional(),
   WA_APP_SECRET: z.string().optional(),
   WA_VERIFY_TOKEN: z.string().optional(),
+
+  /** WaSarathi's generated "Send Template Message (GET)" links, one per template. Secret: they hold the API token. */
+  WASARATHI_TICKET_URL: z.string().url('must be the full link WaSarathi generated').optional(),
+  WASARATHI_REMINDER_URL: z.string().url('must be the full link WaSarathi generated').optional(),
 });
 
 // An empty value in .env ("KEY=") means "not set".

@@ -98,7 +98,7 @@ export interface SendStatus {
   /** False when the server has no queue or WhatsApp settings. */
   configured: boolean;
   problem: string | null;
-  /** "mock" = test mode (messages are only logged); "cloud" = real WhatsApp. */
+  /** "mock" = test mode (messages are only logged); "cloud" or "wasarathi" = real WhatsApp. */
   sender: string | null;
   counts: { unsent: number; queued: number; sent: number; delivered: number; read: number; failed: number };
   /** Bookings that still have unused passes. */

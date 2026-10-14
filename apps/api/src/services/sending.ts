@@ -54,6 +54,9 @@ export async function queueSend(request: SendRequest, actor: Actor) {
   if (Date.now() > event.endsAt.getTime()) throw new HttpError(409, 'event_over', 'The event is over.');
 
   const template = request.mode === 'reminder' ? REMINDER_TEMPLATE : TICKET_TEMPLATE;
+  if (messaging.sender.canSend?.(template) === false) {
+    throw new HttpError(409, 'template_not_configured', `WhatsApp is not set up for the ${template} message yet. Nothing was queued.`);
+  }
   const batchId = randomUUID();
 
   const messageIds = await prisma.$transaction(

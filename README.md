@@ -498,7 +498,7 @@ Steps:
    | `QR_SECRET`, `SESSION_SECRET` | two different long random values |
    | `PUBLIC_BASE_URL` | `https://<your-app>.onrender.com` (the address Render shows), or your own domain |
    | `TRUST_PROXY` | `1` |
-   | `MESSAGE_SENDER` | `mock` to begin with; `cloud` plus the four `WA_*` values for real sending |
+   | `MESSAGE_SENDER` | `mock` to begin with; for real sending either `cloud` plus the four `WA_*` values, or `wasarathi` plus `WASARATHI_TICKET_URL` and `SEND_RATE_PER_SECOND=5` ([docs/whatsapp-template.md](docs/whatsapp-template.md#sending-through-wasarathi)) |
 
    Do not set `PORT`; Render provides it.
 4. **Create your login,** from this repository on your own computer (it only needs the
@@ -545,7 +545,7 @@ a week without use: open the admin dashboard now and then in the run-up.
    | `QR_SECRET`, `SESSION_SECRET` | two different long random values |
    | `PUBLIC_BASE_URL` | the site's public https address (step 6) |
    | `TRUST_PROXY` | `1` |
-   | `MESSAGE_SENDER` | `mock` to begin with; `cloud` plus the four `WA_*` values for real sending |
+   | `MESSAGE_SENDER` | `mock` to begin with; for real sending either `cloud` plus the four `WA_*` values, or `wasarathi` plus `WASARATHI_TICKET_URL` and `SEND_RATE_PER_SECOND=5` ([docs/whatsapp-template.md](docs/whatsapp-template.md#sending-through-wasarathi)) |
 
    Do **not** give this service a public domain. Leave its root directory as the repository root.
 5. **`web` service.** **Create → GitHub Repo**, the same repository, named `web`. Variables:

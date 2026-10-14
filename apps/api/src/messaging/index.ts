@@ -1,14 +1,17 @@
+import { TICKET_TEMPLATE } from '../config/constants';
 import { env } from '../config/env';
 import { HttpError } from '../middleware/errors';
 import { CloudApiSender } from './cloudApiSender';
 import { Messaging } from './messaging';
 import { MockSender } from './mockSender';
+import { REMINDER_TEMPLATE } from './templates';
 import type { MessageSender } from './types';
+import { WaSarathiSender } from './wasarathiSender';
 
 let sender: MessageSender | undefined;
 let messaging: Messaging | undefined;
 
-/** The configured provider: MockSender unless MESSAGE_SENDER=cloud. */
+/** The configured provider: MockSender unless MESSAGE_SENDER is cloud or wasarathi. */
 export function getSender(): MessageSender {
   if (sender) return sender;
   if (env.MESSAGE_SENDER === 'cloud') {
@@ -23,6 +26,13 @@ export function getSender(): MessageSender {
       phoneNumberId: env.WA_PHONE_NUMBER_ID,
       accessToken: env.WA_ACCESS_TOKEN,
       graphVersion: env.WA_GRAPH_VERSION,
+    });
+  } else if (env.MESSAGE_SENDER === 'wasarathi') {
+    if (!env.WASARATHI_TICKET_URL) {
+      throw new HttpError(503, 'sending_not_configured', 'WhatsApp is not set up: WASARATHI_TICKET_URL is missing.');
+    }
+    sender = new WaSarathiSender({
+      endpoints: { [TICKET_TEMPLATE]: env.WASARATHI_TICKET_URL, [REMINDER_TEMPLATE]: env.WASARATHI_REMINDER_URL },
     });
   } else {
     sender = new MockSender();

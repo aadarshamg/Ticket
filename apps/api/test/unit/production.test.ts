@@ -54,6 +54,15 @@ describe('productionConfigProblems', () => {
     ).toEqual([]);
   });
 
+  it('requires the WaSarathi ticket link, over https, when sending through WaSarathi', () => {
+    const wasarathi = { ...good, MESSAGE_SENDER: 'wasarathi', WA_PHONE_NUMBER_ID: undefined, WA_ACCESS_TOKEN: undefined };
+    expect(productionConfigProblems(wasarathi)).toEqual(['WASARATHI_TICKET_URL is required when MESSAGE_SENDER=wasarathi']);
+    expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'http://panel.example/api' })).toEqual([
+      'WASARATHI_TICKET_URL must be an https:// link',
+    ]);
+    expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'https://panel.example/api' })).toEqual([]);
+  });
+
   it('reports every problem at once', () => {
     expect(productionConfigProblems({ ...good, PUBLIC_BASE_URL: 'http://x', REDIS_URL: undefined, DB_SCHEMA: 'a_test' })).toHaveLength(3);
   });

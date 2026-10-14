@@ -11,6 +11,7 @@ export interface ProductionConfig {
   WA_ACCESS_TOKEN?: string;
   WA_APP_SECRET?: string;
   WA_VERIFY_TOKEN?: string;
+  WASARATHI_TICKET_URL?: string;
 }
 
 /**
@@ -37,6 +38,10 @@ export function productionConfigProblems(config: ProductionConfig): string[] {
     for (const name of ['WA_PHONE_NUMBER_ID', 'WA_ACCESS_TOKEN', 'WA_APP_SECRET', 'WA_VERIFY_TOKEN'] as const) {
       if (!config[name]) problems.push(`${name} is required when MESSAGE_SENDER=cloud`);
     }
+  }
+  if (config.MESSAGE_SENDER === 'wasarathi') {
+    if (!config.WASARATHI_TICKET_URL) problems.push('WASARATHI_TICKET_URL is required when MESSAGE_SENDER=wasarathi');
+    else if (!config.WASARATHI_TICKET_URL.startsWith('https://')) problems.push('WASARATHI_TICKET_URL must be an https:// link');
   }
   return problems;
 }

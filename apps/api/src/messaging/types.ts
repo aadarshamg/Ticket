@@ -22,9 +22,12 @@ export type SendResult =
 
 /**
  * Anything that can deliver a template message. The Meta Cloud API implementation is
- * CloudApiSender; a BSP such as AiSensy or Interakt can be added by implementing this.
+ * CloudApiSender; WaSarathiSender goes through the WaSarathi panel. Another BSP can be added by
+ * implementing this.
  */
 export interface MessageSender {
   readonly name: string;
   send(message: OutboundMessage): Promise<SendResult>;
+  /** False when this provider has no set-up for the template; absent means every template works. */
+  canSend?(template: string): boolean;
 }
