@@ -4,7 +4,6 @@ import { EventHeader } from '@/components/pass/EventHeader';
 import { EventInfo, EventOverBanner } from '@/components/pass/EventInfo';
 import { PassCard } from '@/components/pass/PassCard';
 import { PassPageShell } from '@/components/pass/PassPageShell';
-import { Sponsors } from '@/components/pass/Sponsors';
 import { fetchBooking } from '@/lib/server/passApi';
 
 // Booking page: every pass in one booking. The secret code in the URL is the only credential.
@@ -70,8 +69,6 @@ export default async function BookingPage({ params }: { params: Promise<{ code: 
         {passes.length > 1 && (
           <p className="text-center text-xs text-zinc-500">Swipe sideways to see all {passes.length} passes</p>
         )}
-
-        <Sponsors />
 
         <EventInfo event={event} shareHint={passes.length > 1 && !cancelled} />
       </main>
