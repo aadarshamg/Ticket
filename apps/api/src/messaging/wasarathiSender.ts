@@ -22,6 +22,10 @@ const RETRYABLE_TEXT = /rate|limit|too many|try again|timeout|timed out|temporar
 
 /** A variable with a name like PASSLINK or VIEWURL takes the whole pass link. */
 const LINK_VARIABLE = /link|url/i;
+/** A variable named PASSCODE (or BOOKINGCODE, CODE) takes the booking code, wherever it is. */
+const CODE_VARIABLE = /^(pass_?code|booking_?code|code)$/i;
+/** "templateVariable-PASSCODE-10" -> "PASSCODE" */
+const variableName = (key: string) => key.replace(/^templateVariable-/i, '').replace(/-\d+$/, '');
 
 /**
  * Fills a generated link for one recipient. The template's variables are numbered in the link
@@ -41,22 +45,26 @@ export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage, ap
   const variables = [...url.searchParams.keys()]
     .filter((key) => VARIABLE_KEY.test(key))
     .sort((a, b) => Number(a.match(VARIABLE_KEY)![1]) - Number(b.match(VARIABLE_KEY)![1]));
-  // A variable named for a link (PASSLINK) takes the pass link wherever it is in the text; the
-  // others take the message's values in order, and without such a variable the last one is the
-  // button's booking code.
-  const linkKey = variables.find((key) => LINK_VARIABLE.test(key.replace(/^templateVariable-/i, '')));
-  const others = variables.filter((key) => key !== linkKey);
-  const values = linkKey ? [...message.bodyParams] : [...message.bodyParams, message.buttonUrlSuffix];
+  // Variables named for the booking code (PASSCODE: in the button, and again in the text if the
+  // template repeats the link there) take the code; one named for a link (PASSLINK) takes the
+  // whole pass link. The others take the message's values in order. A template whose variables
+  // have none of these names has the button's code as its last variable.
+  const codeKeys = variables.filter((key) => CODE_VARIABLE.test(variableName(key)));
+  const linkKeys = variables.filter((key) => !codeKeys.includes(key) && LINK_VARIABLE.test(variableName(key)));
+  const named = codeKeys.length + linkKeys.length > 0;
+  const others = variables.filter((key) => !codeKeys.includes(key) && !linkKeys.includes(key));
+  const values = named ? [...message.bodyParams] : [...message.bodyParams, message.buttonUrlSuffix];
   if (others.length !== values.length) {
     return {
       error:
-        `The WaSarathi link for ${message.template} has ${variables.length} template variable(s); it needs ${message.bodyParams.length + 1} ` +
-        `(${message.bodyParams.length} in the text, then 1 for the passes: the View Passes button's code, or a PASSLINK variable in the text). ` +
+        `The WaSarathi link for ${message.template} has ${others.length} template variable(s) for the message details; it needs ${values.length} ` +
+        `(${message.bodyParams.length} in the text, plus the booking code: a PASSCODE variable, or the View Passes button's variable). ` +
         'Check the template matches docs/whatsapp-template.md.',
     };
   }
   others.forEach((key, index) => url.searchParams.set(key, values[index]!));
-  if (linkKey) url.searchParams.set(linkKey, message.passUrl);
+  for (const key of codeKeys) url.searchParams.set(key, message.buttonUrlSuffix);
+  for (const key of linkKeys) url.searchParams.set(key, message.passUrl);
   if (apiToken) url.searchParams.set('apiToken', apiToken);
   if (!url.searchParams.get('apiToken') || url.searchParams.get('apiToken') === 'XXXX') {
     return { error: 'The WaSarathi API key is missing: set WASARATHI_API_TOKEN' };

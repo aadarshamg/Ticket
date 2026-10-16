@@ -53,7 +53,7 @@ describe('buildWaSarathiUrl', () => {
 
   it('refuses a link whose template has a different number of variables', () => {
     const result = buildWaSarathiUrl(generatedLink(9), message);
-    expect(result).toEqual({ error: expect.stringContaining('has 9 template variable(s); it needs 10') });
+    expect(result).toEqual({ error: expect.stringContaining('has 9 template variable(s) for the message details; it needs 10') });
   });
 });
 
@@ -126,6 +126,18 @@ describe('WaSarathiSender', () => {
     const url = buildWaSarathiUrl(link, message) as URL;
     expect(url.searchParams.get('templateVariable-PASSLINK-10')).toBe('https://passes.example.com/b/ABCDEFGH2345');
     expect(url.searchParams.get('templateVariable-organiser-9')).toBe('Sangam Events');
+  });
+
+  it('fills every PASSCODE variable with the booking code: one in the text and one in the button', () => {
+    // Nine message details, then PASSCODE in the text (10) and again in the button (11), as WaSarathi generates it.
+    const link = generatedLink(9) + '&templateVariable-PASSCODE-10=sample&templateVariable-PASSCODE-11=sample';
+    const url = buildWaSarathiUrl(link, message) as URL;
+    expect(url.searchParams.get('templateVariable-organiser-9')).toBe('Sangam Events');
+    expect(url.searchParams.get('templateVariable-PASSCODE-10')).toBe('ABCDEFGH2345');
+    expect(url.searchParams.get('templateVariable-PASSCODE-11')).toBe('ABCDEFGH2345');
+    // A single PASSCODE in the button works the same way.
+    const single = buildWaSarathiUrl(generatedLink(9) + '&templateVariable-PASSCODE-10=x', message) as URL;
+    expect(single.searchParams.get('templateVariable-PASSCODE-10')).toBe('ABCDEFGH2345');
   });
 
   it('fails without calling out when the template has no link or the wrong variables', async () => {
