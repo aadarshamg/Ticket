@@ -185,3 +185,44 @@ describe('PATCH /api/tickets/:id', () => {
     expect(actions).toEqual(['ticket.cancel', 'ticket.update', 'ticket.restore']);
   });
 });
+
+describe('POST /api/tickets (add a booking by hand)', () => {
+  const add = (body: Record<string, unknown>) => agent.post('/api/tickets').set('X-CSRF-Token', csrf).send(body);
+
+  it('adds a booking with its passes, making up an order ID when none is given', async () => {
+    const res = await add({ name: 'Ravi Kumar', phone: '98765 43210', passCount: 3, category: 'Guest list' });
+    expect(res.status).toBe(201);
+    expect(res.body.sendError).toBeNull();
+    expect(res.body.ticket).toMatchObject({ name: 'Ravi Kumar', phone: '+919876543210', passCount: 3, category: 'Guest list', messageStatus: 'unsent' });
+    expect(res.body.ticket.orderId).toMatch(/^ADD-[2-9A-HJ-NP-Z]{5}$/);
+    expect(await prisma.pass.count({ where: { ticketId: res.body.ticket.id, status: 'valid' } })).toBe(3);
+    expect(await prisma.auditLog.count({ where: { action: 'ticket.create' } })).toBe(1);
+  });
+
+  it('keeps a given order ID, and refuses one that is taken or a bad phone', async () => {
+    expect((await add({ orderId: 'WALK-1', name: 'Asha Rao', phone: '9876543210', passCount: 1 })).body.ticket.orderId).toBe('WALK-1');
+    const taken = await add({ orderId: 'WALK-1', name: 'Dev Shah', phone: '9811122233', passCount: 1 });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error.details).toEqual([{ path: 'orderId', message: 'Another booking already has this order ID' }]);
+    const badPhone = await add({ name: 'Dev Shah', phone: '12345', passCount: 1 });
+    expect(badPhone.status).toBe(400);
+    expect(badPhone.body.error.details[0].path).toBe('phone');
+  });
+
+  it('on a multi-night event, needs the night, and the night can be changed later', async () => {
+    await prisma.event.update({
+      where: { id: 1 },
+      data: { startsAt: new Date('2026-11-14T18:00:00+05:30'), gatesOpenAt: new Date('2026-11-14T17:30:00+05:30'), endsAt: new Date('2026-11-15T23:00:00+05:30') },
+    });
+    const missing = await add({ name: 'Ravi Kumar', phone: '9876543210', passCount: 2 });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.details[0]).toEqual({ path: 'night', message: 'Choose the night: Sat, 14 Nov or Sun, 15 Nov' });
+
+    const added = await add({ name: 'Ravi Kumar', phone: '9876543210', passCount: 2, night: '2026-11-14' });
+    expect(added.body.ticket.night).toBe('2026-11-14');
+    const moved = await patch(added.body.ticket.id, { night: '2026-11-15' });
+    expect(moved.status).toBe(200);
+    expect(moved.body.night).toBe('2026-11-15');
+    expect((await patch(added.body.ticket.id, { night: '2026-11-20' })).status).toBe(400);
+  });
+});

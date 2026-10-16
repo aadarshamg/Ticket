@@ -6,7 +6,9 @@ import { Dialog } from '@/components/Dialog';
 import { Field } from '@/components/Field';
 import { api, ApiError } from '@/lib/api';
 import { formatNight } from '@/lib/ist';
-import type { Booking, BookingList, BookingStatus, EntryStatus, MessageStatus } from '@/lib/types';
+import type { Booking, BookingList, BookingStatus, EntryStatus, MessageStatus, SettingsResponse } from '@/lib/types';
+
+type Night = SettingsResponse['nights'][number];
 
 const PAGE_SIZE = 50;
 
@@ -46,8 +48,9 @@ function StatusBadges({ booking }: { booking: Booking }) {
 
 // --- Edit dialog -----------------------------------------------------------
 
-function EditForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (b: Booking) => void; onCancel: () => void }) {
+function EditForm({ booking, nights, onDone, onCancel }: { booking: Booking; nights: Night[]; onDone: (b: Booking) => void; onCancel: () => void }) {
   const [name, setName] = useState(booking.name);
+  const [night, setNight] = useState(booking.night ?? '');
   const [phone, setPhone] = useState(booking.phone);
   const [passCount, setPassCount] = useState(String(booking.passCount));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -60,6 +63,7 @@ function EditForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (b:
     if (name.trim() !== booking.name) patch.name = name;
     if (phone.trim() !== booking.phone) patch.phone = phone;
     if (Number(passCount) !== booking.passCount) patch.passCount = Number(passCount);
+    if (night && night !== booking.night) patch.night = night;
     if (Object.keys(patch).length === 0) return onCancel();
 
     setSaving(true);
@@ -100,12 +104,133 @@ function EditForm({ booking, onDone, onCancel }: { booking: Booking; onDone: (b:
           className={`input ${errors.passCount ? 'input-error' : ''}`} value={passCount}
           onChange={(e) => setPassCount(e.target.value)} />
       </Field>
+      {nights.length > 1 && (
+        <Field label="Night" htmlFor="edit-night" error={errors.night}
+          hint="If you change this after sending, resend the WhatsApp message: it says the date.">
+          <select id="edit-night" className={`input ${errors.night ? 'input-error' : ''}`} value={night}
+            onChange={(e) => setNight(e.target.value)}>
+            {!night && <option value="">Any night</option>}
+            {nights.map((item) => (
+              <option key={item.date} value={item.date}>{item.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
       <div className="flex justify-end gap-3">
         <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>
           Close
         </button>
         <button type="submit" className="btn-primary" disabled={saving}>
           {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// --- Add booking dialog ----------------------------------------------------
+
+/** A guest who is not in an uploaded list: added here, with their passes, and sent at once if wanted. */
+function AddForm({ nights, onDone, onCancel }: { nights: Night[]; onDone: (note: string) => void; onCancel: () => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [passCount, setPassCount] = useState('1');
+  const [night, setNight] = useState(nights.length === 1 ? nights[0]!.date : '');
+  const [category, setCategory] = useState('Guest list');
+  const [orderId, setOrderId] = useState('');
+  const [sendNow, setSendNow] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setErrors({});
+    setMessage(null);
+    try {
+      const { ticket, sendError } = await api<{ ticket: Booking; sendError: string | null }>('/api/tickets', {
+        method: 'POST',
+        body: {
+          name,
+          phone,
+          passCount: Number(passCount),
+          ...(night ? { night } : {}),
+          ...(category.trim() ? { category } : {}),
+          ...(orderId.trim() ? { orderId } : {}),
+          sendNow,
+        },
+      });
+      const passes = `${ticket.passCount} ${ticket.passCount === 1 ? 'pass' : 'passes'}`;
+      const sent = !sendNow
+        ? 'Use Send on their row when you are ready.'
+        : sendError
+          ? `The WhatsApp message was not sent: ${sendError}`
+          : 'Their WhatsApp message is on its way.';
+      onDone(`Added ${ticket.name} (${ticket.orderId}, ${passes}). ${sent}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.details.length > 0) {
+        setErrors(Object.fromEntries(err.details.map((detail) => [detail.path, detail.message])));
+      } else {
+        setMessage(err instanceof Error ? err.message : 'Something went wrong');
+      }
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      {message && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          {message}
+        </p>
+      )}
+      <Field label="Name" htmlFor="add-name" error={errors.name}>
+        <input id="add-name" className={`input ${errors.name ? 'input-error' : ''}`} value={name} maxLength={80} autoFocus
+          onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Phone (WhatsApp)" htmlFor="add-phone" error={errors.phone} hint="10-digit mobile number.">
+        <input id="add-phone" type="tel" inputMode="tel" className={`input ${errors.phone ? 'input-error' : ''}`}
+          value={phone} maxLength={30} onChange={(e) => setPhone(e.target.value)} />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Number of people" htmlFor="add-passes" error={errors.passCount} hint="One QR pass each.">
+          <input id="add-passes" type="number" inputMode="numeric" min={1}
+            className={`input ${errors.passCount ? 'input-error' : ''}`} value={passCount}
+            onChange={(e) => setPassCount(e.target.value)} />
+        </Field>
+        {nights.length > 1 && (
+          <Field label="Night" htmlFor="add-night" error={errors.night}>
+            <select id="add-night" className={`input ${errors.night ? 'input-error' : ''}`} value={night}
+              onChange={(e) => setNight(e.target.value)}>
+              <option value="">Choose…</option>
+              {nights.map((item) => (
+                <option key={item.date} value={item.date}>{item.label}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Category" htmlFor="add-category" error={errors.category} hint="Optional.">
+          <input id="add-category" className={`input ${errors.category ? 'input-error' : ''}`} value={category} maxLength={60}
+            onChange={(e) => setCategory(e.target.value)} />
+        </Field>
+        <Field label="Order ID" htmlFor="add-order" error={errors.orderId} hint="Optional. Left empty, one is made up.">
+          <input id="add-order" className={`input ${errors.orderId ? 'input-error' : ''}`} value={orderId} maxLength={64}
+            onChange={(e) => setOrderId(e.target.value)} />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-zinc-700">
+        <input type="checkbox" className="h-4 w-4 accent-zinc-900" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
+        Send their passes on WhatsApp now
+      </label>
+      <div className="flex justify-end gap-3">
+        <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>
+          Close
+        </button>
+        <button type="submit" className="btn-primary" disabled={saving || !name.trim() || !phone.trim()}>
+          {saving ? 'Adding…' : sendNow ? 'Add and send' : 'Add booking'}
         </button>
       </div>
     </form>
@@ -215,6 +340,15 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ kind: 'edit' | 'status' | 'send'; booking: Booking } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [nights, setNights] = useState<Night[]>([]);
+
+  useEffect(() => {
+    api<SettingsResponse>('/api/event')
+      .then((settings) => setNights(settings.nights))
+      .catch(() => undefined); // the night choice is just hidden if this fails
+  }, []);
   const latestRequest = useRef(0);
 
   useEffect(() => {
@@ -290,7 +424,17 @@ export default function BookingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Bookings</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Bookings</h1>
+        <button type="button" className="btn-primary" onClick={() => { setNotice(null); setAdding(true); }}>
+          + Add booking
+        </button>
+      </div>
+      {notice && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="card grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2 lg:col-span-1">
@@ -411,9 +555,22 @@ export default function BookingsPage() {
         </div>
       )}
 
+      <Dialog open={adding} onClose={() => setAdding(false)} title="Add a booking">
+        {adding && (
+          <AddForm
+            nights={nights}
+            onDone={(note) => {
+              setAdding(false);
+              setNotice(note);
+              void load();
+            }}
+            onCancel={() => setAdding(false)}
+          />
+        )}
+      </Dialog>
       <Dialog open={dialog?.kind === 'edit'} onClose={() => setDialog(null)} title="Edit booking">
         {dialog?.kind === 'edit' && (
-          <EditForm key={dialog.booking.id} booking={dialog.booking} onDone={onSaved} onCancel={() => setDialog(null)} />
+          <EditForm key={dialog.booking.id} booking={dialog.booking} nights={nights} onDone={onSaved} onCancel={() => setDialog(null)} />
         )}
       </Dialog>
       <Dialog open={dialog?.kind === 'send'} onClose={() => setDialog(null)} title="Send on WhatsApp?">

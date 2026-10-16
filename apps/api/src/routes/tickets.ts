@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { adminActor, requireAdmin, requireCsrf } from '../middleware/auth';
 import { HttpError } from '../middleware/errors';
-import { ticketListQuerySchema, ticketPatchSchema } from '../schemas/ticket';
+import { ticketCreateSchema, ticketListQuerySchema, ticketPatchSchema } from '../schemas/ticket';
 import { resendTicket } from '../services/sending';
-import { listTickets, updateTicket } from '../services/tickets';
+import { createTicket, listTickets, updateTicket } from '../services/tickets';
 
 export function ticketsRouter(): Router {
   const router = Router();
@@ -13,6 +13,22 @@ export function ticketsRouter(): Router {
   // List / search / filter
   router.get('/', async (req, res) => {
     res.json(await listTickets(ticketListQuerySchema.parse(req.query)));
+  });
+
+  // Add one booking by hand, optionally sending its WhatsApp message straight away
+  router.post('/', async (req, res) => {
+    const input = ticketCreateSchema.parse(req.body);
+    const ticket = await createTicket(input, adminActor(req));
+    let sendError: string | null = null;
+    if (input.sendNow) {
+      try {
+        await resendTicket(ticket.id, adminActor(req));
+      } catch (error) {
+        // The booking is saved either way; say why the message did not go.
+        sendError = error instanceof Error ? error.message : 'The message could not be queued';
+      }
+    }
+    res.status(201).json({ ticket, sendError });
   });
 
   // Edit or cancel

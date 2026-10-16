@@ -31,9 +31,31 @@ export const ticketPatchSchema = z
       .optional(),
     /** "cancelled" cancels the booking and its unused passes; "active" restores it. */
     status: z.enum(['active', 'cancelled']).optional(),
+    /** The night the booking is for ("2026-10-18"), on a multi-night event. */
+    night: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a night').optional(),
   })
   .strict()
   .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: 'Nothing to change',
   });
 export type TicketPatch = z.infer<typeof ticketPatchSchema>;
+
+/** Body of POST /api/tickets: one booking added by hand in the dashboard. */
+export const ticketCreateSchema = z
+  .object({
+    /** Left empty, one is made up (ADD-XXXXX). */
+    orderId: z.string().trim().max(64, 'Order ID must be at most 64 characters').optional(),
+    name: z.string().trim().min(2, 'Name must be 2 to 80 characters').max(80, 'Name must be 2 to 80 characters'),
+    phone: z.string().trim().min(1, 'Enter a phone number').max(30),
+    passCount: z
+      .number({ invalid_type_error: 'Enter a number' })
+      .int('Enter a whole number')
+      .min(1, 'Must be at least 1'),
+    night: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a night').optional(),
+    category: z.string().trim().max(60, 'Category must be at most 60 characters').optional(),
+    email: z.string().trim().toLowerCase().email('Email is not valid').max(254).optional().or(z.literal('')),
+    /** Queue the WhatsApp message straight away. */
+    sendNow: z.boolean().optional(),
+  })
+  .strict();
+export type TicketCreate = z.infer<typeof ticketCreateSchema>;
