@@ -21,3 +21,9 @@ Thumbs.db
 
 # local helper programs (portable Redis for development on Windows)
 .tools/
+
+# Guest lists and prepared upload files hold customers' personal data: never commit them.
+private/
+*GUEST*LIST*.xlsx
+*guest*list*.xlsx
+UPLOAD THIS*
