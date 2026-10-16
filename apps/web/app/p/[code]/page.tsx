@@ -4,6 +4,7 @@ import { EventHeader } from '@/components/pass/EventHeader';
 import { EventInfo, EventOverBanner } from '@/components/pass/EventInfo';
 import { PassCard } from '@/components/pass/PassCard';
 import { PassPageShell } from '@/components/pass/PassPageShell';
+import { Sponsors } from '@/components/pass/Sponsors';
 import { fetchPass } from '@/lib/server/passApi';
 
 // Single-pass page, for a group member the buyer forwarded one pass to.
@@ -31,6 +32,7 @@ export default async function PassPage({ params }: { params: Promise<{ code: str
         </div>
         <EventOverBanner />
         <PassCard pass={pass} passCount={pass.passCount} event={event} />
+        <Sponsors />
         <EventInfo event={event} shareHint={false} />
       </main>
     </PassPageShell>
