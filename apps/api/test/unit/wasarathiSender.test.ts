@@ -8,6 +8,7 @@ const message: OutboundMessage = {
   language: 'en',
   bodyParams: ['Asha Rao', 'Winter Music Night', 'Saturday, 14 Nov 2026', '18:00', 'Palace Grounds, Bengaluru', '4', '3,196', 'ORD-1001', 'Sangam Events'],
   buttonUrlSuffix: 'ABCDEFGH2345',
+  passUrl: 'https://passes.example.com/b/ABCDEFGH2345',
 };
 
 /** A link as WaSarathi generates it: sample values in every variable, variables in any order. */
@@ -108,6 +109,23 @@ describe('WaSarathiSender', () => {
       expect(result.ok).toBe(false);
       expect(JSON.stringify(result)).not.toContain('SECRET-TOKEN');
     }
+  });
+
+  it('uses the API key from its own setting, so the link need not contain it', async () => {
+    const link = generatedLink().replace('SECRET-TOKEN', 'XXXX');
+    const withKey = buildWaSarathiUrl(link, message, 'REAL-KEY') as URL;
+    expect(withKey.searchParams.get('apiToken')).toBe('REAL-KEY');
+    expect(buildWaSarathiUrl(link, message)).toEqual({ error: 'The WaSarathi API key is missing: set WASARATHI_API_TOKEN' });
+  });
+
+  it('puts the whole pass link into a variable named for a link, wherever it is in the text', () => {
+    const link = generatedLink(9) + '&templateVariable-PASSLINK-10=sample';
+    const middle = buildWaSarathiUrl(generatedLink(9).replace('templateVariable-organiser-9', 'templateVariable-PASSLINK-9') + '&templateVariable-thanks-10=x', message) as URL;
+    expect(middle.searchParams.get('templateVariable-PASSLINK-9')).toBe('https://passes.example.com/b/ABCDEFGH2345');
+    expect(middle.searchParams.get('templateVariable-thanks-10')).toBe('Sangam Events');
+    const url = buildWaSarathiUrl(link, message) as URL;
+    expect(url.searchParams.get('templateVariable-PASSLINK-10')).toBe('https://passes.example.com/b/ABCDEFGH2345');
+    expect(url.searchParams.get('templateVariable-organiser-9')).toBe('Sangam Events');
   });
 
   it('fails without calling out when the template has no link or the wrong variables', async () => {

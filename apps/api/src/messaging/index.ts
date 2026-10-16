@@ -33,6 +33,7 @@ export function getSender(): MessageSender {
     }
     sender = new WaSarathiSender({
       endpoints: { [TICKET_TEMPLATE]: env.WASARATHI_TICKET_URL, [REMINDER_TEMPLATE]: env.WASARATHI_REMINDER_URL },
+      apiToken: env.WASARATHI_API_TOKEN,
     });
   } else {
     sender = new MockSender();

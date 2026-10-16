@@ -92,41 +92,45 @@ Thank you, {{8}}.
 ## Sending through WaSarathi
 
 WaSarathi submits templates to Meta and sends them for you, so no Meta app, access token or
-webhook is needed here.
+webhook is needed here. Its API cannot fill a variable in a button, so the buyer's own link goes
+in the message text instead (WhatsApp makes it tappable).
 
 1. In WaSarathi, open **Chatbot Manager → WhatsApp Bot → Automation → Message Templates**.
-   - Under **Variables**, create ten custom variables: `BUYER`, `EVENT`, `DATE`, `STARTTIME`,
-     `VENUECITY`, `PASSES`, `AMOUNT`, `ORDERID`, `ORGANISER`, `PASSCODE` (letters only).
+   - Under **Variables**, create ten custom variables (letters only): `BUYER`, `EVENT`,
+     `DATE`, `STARTTIME`, `VENUECITY`, `PASSES`, `AMOUNT`, `ORDERID`, `PASSLINK`,
+     `ORGANISER`.
    - Under **Templates**, choose **Create → Mixed Template** (the other forms only allow
-     Marketing). Name `event_ticket`, category **Utility**, no header, and this body, which is
-     the one above with WaSarathi's `#!NAME!#` variables in the same order:
+     Marketing). Name `event_pass` (lower-case letters and underscores only), category
+     **Utility**, no header, no buttons, and this body:
 
      ```
      Dear #!BUYER!#, your entry pass has been generated for #!EVENT!# on #!DATE!#, #!STARTTIME!# (24-hour format), at #!VENUECITY!#.
 
      Number of passes: #!PASSES!#. Total amount: Rs #!AMOUNT!#. Order ID: #!ORDERID!#.
 
-     Tap the button below to view your passes and show the QR code at the entry gate. Each pass admits one person, once. You can forward a pass to each person in your group from the pass page.
+     View your passes here: #!PASSLINK!#
+
+     Show the QR code at the entry gate. Each pass admits one person, once. You can forward a pass to each person in your group from the pass page.
 
      Thank you, #!ORGANISER!#. See you at the event!
      ```
 
-     WaSarathi only allows lower-case letters and underscores in the name (use `event_ticket`),
-     and refuses a body that starts or ends with a variable, hence the closing words.
-   - **Add button → Visit website** (not the quick-reply "Custom"), text `View Passes`, URL type
-     **Dynamic**, URL `https://tickets.tspevents.in/b/#!PASSCODE!#` (your `PUBLIC_BASE_URL`
-     followed by `/b/` and the PASSCODE variable).
+     WaSarathi refuses a body that starts or ends with a variable, hence the closing words.
    - Submit, and wait until it shows as approved.
-2. Go to **API Developer → Generate API End-point**, choose **Send Template Message (GET)** and the
-   approved template, and copy the link it generates. It contains your API token: treat it like a
+2. Go to the **Developer** page (search the menu for "API"), **WhatsApp API → Send Text
+   Message/Template**, and at **Generate API End-point: Send Template Message**, pick the account
+   and `event_pass`. Fill every box with a sample value (an empty one may be left out of the
+   link) and click **Get API end-point**. The GET link holds your API key: treat it like a
    password.
 3. On the server set `MESSAGE_SENDER=wasarathi`, `WASARATHI_TICKET_URL=<that link>` and
-   `SEND_RATE_PER_SECOND=5`. Do the same for `event_reminder_v1` with `WASARATHI_REMINDER_URL` if you
-   want reminders.
+   `SEND_RATE_PER_SECOND=5`. To keep the key out of the link, replace its value after
+   `apiToken=` with `XXXX` and set `WASARATHI_API_TOKEN` to the key instead.
 4. In **Admin → Send**, use **Send a test** to your own number before sending to buyers.
 
-The link must have **ten** template variables: the nine in the text, then the button's (the app
-puts the booking code there). If the numbers do not match, the test send says so and nothing goes out.
+How the app fills the link: a variable whose name contains LINK or URL gets the buyer's pass
+link (`PUBLIC_BASE_URL/b/<code>`); the others get the nine values above in order. A template with
+a dynamic **View Passes** button instead would need ten variables, the tenth being the button's
+code. If the numbers do not match, the test send says so and nothing goes out.
 
 Delivered and read ticks are shown in WaSarathi, not in this dashboard: messages sent through
 WaSarathi stay at **Sent** here.

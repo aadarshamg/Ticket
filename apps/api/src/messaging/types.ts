@@ -8,6 +8,8 @@ export interface OutboundMessage {
   bodyParams: string[];
   /** Appended to the template's URL button: https://{DOMAIN}/b/<suffix>. */
   buttonUrlSuffix: string;
+  /** The whole link to the booking's passes, for templates that carry it in their text. */
+  passUrl: string;
 }
 
 export type SendResult =

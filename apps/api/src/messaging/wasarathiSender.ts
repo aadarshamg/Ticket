@@ -7,9 +7,11 @@ export interface WaSarathiConfig {
    * (API Developer → Generate API End-point), keyed by template name. It looks like
    *   https://<panel>/api/v1/whatsapp/send/template?apiToken=…&phone_number_id=…&template_id=…
    *     &templateVariable-name-1=…&…&templateVariable-code-10=…&phone_number=…
-   * and holds the account's API token, so it is a secret.
+   * The link may hold the account's API token; set `apiToken` instead to keep it out of the link.
    */
   endpoints: Record<string, string | undefined>;
+  /** The account's API key. When set, it replaces whatever apiToken the link carries. */
+  apiToken?: string;
   /** Injected in tests. */
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -18,12 +20,17 @@ export interface WaSarathiConfig {
 const VARIABLE_KEY = /^templateVariable-.*-(\d+)$/i;
 const RETRYABLE_TEXT = /rate|limit|too many|try again|timeout|timed out|temporar|unavailable|busy/i;
 
+/** A variable with a name like PASSLINK or VIEWURL takes the whole pass link. */
+const LINK_VARIABLE = /link|url/i;
+
 /**
  * Fills a generated link for one recipient. The template's variables are numbered in the link
  * in template order (WaSarathi numbers the text variables first, then the button's), so they get
- * the body values in order and then the button's URL suffix: the booking code.
+ * the body values in order and then the booking code for a dynamic "View Passes" button. A
+ * template that puts the link in its text instead (because its button cannot carry a variable)
+ * names that variable for a link, e.g. PASSLINK, and it gets the whole pass link.
  */
-export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage): URL | { error: string } {
+export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage, apiToken?: string): URL | { error: string } {
   let url: URL;
   try {
     url = new URL(endpoint);
@@ -34,15 +41,26 @@ export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage): U
   const variables = [...url.searchParams.keys()]
     .filter((key) => VARIABLE_KEY.test(key))
     .sort((a, b) => Number(a.match(VARIABLE_KEY)![1]) - Number(b.match(VARIABLE_KEY)![1]));
-  const values = [...message.bodyParams, message.buttonUrlSuffix];
-  if (variables.length !== values.length) {
+  // A variable named for a link (PASSLINK) takes the pass link wherever it is in the text; the
+  // others take the message's values in order, and without such a variable the last one is the
+  // button's booking code.
+  const linkKey = variables.find((key) => LINK_VARIABLE.test(key.replace(/^templateVariable-/i, '')));
+  const others = variables.filter((key) => key !== linkKey);
+  const values = linkKey ? [...message.bodyParams] : [...message.bodyParams, message.buttonUrlSuffix];
+  if (others.length !== values.length) {
     return {
       error:
-        `The WaSarathi link for ${message.template} has ${variables.length} template variable(s); it needs ${values.length} ` +
-        `(${message.bodyParams.length} in the text and 1 for the View Passes button). Check the template matches docs/whatsapp-template.md.`,
+        `The WaSarathi link for ${message.template} has ${variables.length} template variable(s); it needs ${message.bodyParams.length + 1} ` +
+        `(${message.bodyParams.length} in the text, then 1 for the passes: the View Passes button's code, or a PASSLINK variable in the text). ` +
+        'Check the template matches docs/whatsapp-template.md.',
     };
   }
-  variables.forEach((key, index) => url.searchParams.set(key, values[index]!));
+  others.forEach((key, index) => url.searchParams.set(key, values[index]!));
+  if (linkKey) url.searchParams.set(linkKey, message.passUrl);
+  if (apiToken) url.searchParams.set('apiToken', apiToken);
+  if (!url.searchParams.get('apiToken') || url.searchParams.get('apiToken') === 'XXXX') {
+    return { error: 'The WaSarathi API key is missing: set WASARATHI_API_TOKEN' };
+  }
 
   // Recipient: country code and number, digits only. Some panels call it sendToPhoneNumber.
   const recipient = message.to.replace(/\D/g, '');
@@ -85,7 +103,7 @@ export class WaSarathiSender implements MessageSender {
         errorText: `No WaSarathi link is set for the ${message.template} template.`,
       };
     }
-    const url = buildWaSarathiUrl(endpoint, message);
+    const url = buildWaSarathiUrl(endpoint, message, this.config.apiToken);
     if (!(url instanceof URL)) {
       return { ok: false, retryable: false, errorCode: 'template_variables', errorText: url.error.slice(0, 500) };
     }

@@ -59,6 +59,8 @@ const schema = z.object({
   /** WaSarathi's generated "Send Template Message (GET)" links, one per template. Secret: they hold the API token. */
   WASARATHI_TICKET_URL: z.string().url('must be the full link WaSarathi generated').optional(),
   WASARATHI_REMINDER_URL: z.string().url('must be the full link WaSarathi generated').optional(),
+  /** The WaSarathi API key, kept apart from the links so they can be shared without it. */
+  WASARATHI_API_TOKEN: z.string().optional(),
 });
 
 // An empty value in .env ("KEY=") means "not set".

@@ -1,5 +1,6 @@
 import type { Event, Prisma } from '@prisma/client';
 import { TICKET_TEMPLATE } from '../config/constants';
+import { env } from '../config/env';
 import { bookingTimes, nightFromDb } from '../lib/nights';
 import { formatIstDate, formatIstTime } from '../lib/time';
 import type { OutboundMessage } from './types';
@@ -17,6 +18,8 @@ export interface MessageTicket {
   /** The booking's night on a multi-night event; its date and times go into the message. */
   night?: Date | null;
 }
+
+const passUrl = (code: string) => `${env.PUBLIC_BASE_URL}/b/${code}`;
 
 /** The date and times this booking's message should give: its own night's, or the event's. */
 function timesFor(event: Event, ticket: MessageTicket) {
@@ -57,6 +60,7 @@ export function buildTicketMessage(event: Event, ticket: MessageTicket): Outboun
       event.organiserName,
     ].map(cleanParam),
     buttonUrlSuffix: ticket.code,
+    passUrl: passUrl(ticket.code),
   };
 }
 
@@ -82,5 +86,6 @@ export function buildReminderMessage(event: Event, ticket: MessageTicket, unused
       event.organiserName,
     ].map(cleanParam),
     buttonUrlSuffix: ticket.code,
+    passUrl: passUrl(ticket.code),
   };
 }

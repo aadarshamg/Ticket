@@ -1,6 +1,7 @@
 import { Prisma, type Event } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 import { buildReminderMessage, buildTicketMessage, cleanParam, formatAmount } from '../../src/messaging/templates';
+import { env } from '../../src/config/env';
 import { formatIstDate, formatIstTime } from '../../src/lib/time';
 
 const event = {
@@ -56,6 +57,7 @@ describe('event_ticket_v1', () => {
         'Sangam Events', // 9 organiser name
       ],
       buttonUrlSuffix: 'ABCDEFGH2345',
+      passUrl: `${env.PUBLIC_BASE_URL}/b/ABCDEFGH2345`,
     });
   });
 
@@ -99,6 +101,7 @@ describe('event_reminder_v1', () => {
         'Sangam Events',
       ],
       buttonUrlSuffix: 'ABCDEFGH2345',
+      passUrl: `${env.PUBLIC_BASE_URL}/b/ABCDEFGH2345`,
     });
   });
 });

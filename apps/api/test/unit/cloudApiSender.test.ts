@@ -9,6 +9,7 @@ const message: OutboundMessage = {
   language: 'en',
   bodyParams: ['Asha Rao', 'Winter Music Night', 'Saturday, 14 Nov 2026', '18:00', 'Palace Grounds, Bengaluru', '4', '3,196', 'ORD-1001', 'Sangam Events'],
   buttonUrlSuffix: 'ABCDEFGH2345',
+  passUrl: 'https://passes.example.com/b/ABCDEFGH2345',
 };
 
 /** A fetch stand-in that records the request and answers with the given status and JSON. */

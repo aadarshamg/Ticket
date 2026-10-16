@@ -60,7 +60,14 @@ describe('productionConfigProblems', () => {
     expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'http://panel.example/api' })).toEqual([
       'WASARATHI_TICKET_URL must be an https:// link',
     ]);
-    expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'https://panel.example/api' })).toEqual([]);
+    // The API key comes from the link itself, or from WASARATHI_API_TOKEN when the link has none.
+    expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'https://panel.example/api?apiToken=key' })).toEqual([]);
+    expect(productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'https://panel.example/api?apiToken=XXXX' })).toEqual([
+      'WASARATHI_API_TOKEN is required when the WaSarathi link has no API key',
+    ]);
+    expect(
+      productionConfigProblems({ ...wasarathi, WASARATHI_TICKET_URL: 'https://panel.example/api?apiToken=XXXX', WASARATHI_API_TOKEN: 'key' }),
+    ).toEqual([]);
   });
 
   it('reports every problem at once', () => {
