@@ -14,6 +14,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // The pages are designed in light colours (the scanner draws its own dark screen). Asking
+  // browsers not to darken them keeps the passes readable and their QR codes scannable on
+  // phones set to dark mode.
+  colorScheme: 'only light',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

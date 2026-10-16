@@ -10,6 +10,11 @@ export interface OutboundMessage {
   buttonUrlSuffix: string;
   /** The whole link to the booking's passes, for templates that carry it in their text. */
   passUrl: string;
+  /**
+   * The same values as bodyParams, by the variable names a panel such as WaSarathi uses
+   * (BUYER, DATE, ORDERID...), so a template may leave some out or put them in another order.
+   */
+  namedParams?: Record<string, string>;
 }
 
 export type SendResult =

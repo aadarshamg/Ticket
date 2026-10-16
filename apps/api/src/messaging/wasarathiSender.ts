@@ -54,6 +54,16 @@ export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage, ap
   const named = codeKeys.length + linkKeys.length > 0;
   const others = variables.filter((key) => !codeKeys.includes(key) && !linkKeys.includes(key));
   const values = named ? [...message.bodyParams] : [...message.bodyParams, message.buttonUrlSuffix];
+  // When every remaining variable is named after one of the message's values (BUYER, DATE...),
+  // fill them by name: the template may then leave some out, such as AMOUNT, or reorder them.
+  const byName = message.namedParams;
+  const nameOf = (key: string) => variableName(key).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (byName && others.length > 0 && others.every((key) => nameOf(key) in byName)) {
+    others.forEach((key) => url.searchParams.set(key, byName[nameOf(key)]!));
+    for (const key of codeKeys) url.searchParams.set(key, message.buttonUrlSuffix);
+    for (const key of linkKeys) url.searchParams.set(key, message.passUrl);
+    return finish(url, message, apiToken);
+  }
   if (others.length !== values.length) {
     return {
       error:
@@ -65,6 +75,11 @@ export function buildWaSarathiUrl(endpoint: string, message: OutboundMessage, ap
   others.forEach((key, index) => url.searchParams.set(key, values[index]!));
   for (const key of codeKeys) url.searchParams.set(key, message.buttonUrlSuffix);
   for (const key of linkKeys) url.searchParams.set(key, message.passUrl);
+  return finish(url, message, apiToken);
+}
+
+/** Puts in the API key and the recipient. */
+function finish(url: URL, message: OutboundMessage, apiToken?: string): URL | { error: string } {
   if (apiToken) url.searchParams.set('apiToken', apiToken);
   if (!url.searchParams.get('apiToken') || url.searchParams.get('apiToken') === 'XXXX') {
     return { error: 'The WaSarathi API key is missing: set WASARATHI_API_TOKEN' };

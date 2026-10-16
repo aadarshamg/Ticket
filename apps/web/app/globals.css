@@ -7,6 +7,7 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: only light;
   }
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased;

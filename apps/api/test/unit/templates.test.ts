@@ -41,7 +41,7 @@ describe('IST formatting', () => {
 
 describe('event_ticket_v1', () => {
   it('fills the nine body variables in the agreed order, with the booking code on the button', () => {
-    expect(buildTicketMessage(event, ticket)).toEqual({
+    expect(buildTicketMessage(event, ticket)).toMatchObject({
       to: '+919876543210',
       template: 'event_ticket_v1',
       language: 'en',
@@ -86,7 +86,7 @@ describe('formatAmount', () => {
 
 describe('event_reminder_v1', () => {
   it('fills its eight body variables', () => {
-    expect(buildReminderMessage(event, ticket, 3)).toEqual({
+    expect(buildReminderMessage(event, ticket, 3)).toMatchObject({
       to: '+919876543210',
       template: 'event_reminder_v1',
       language: 'en',
@@ -109,5 +109,16 @@ describe('event_reminder_v1', () => {
 describe('cleanParam', () => {
   it('collapses whitespace', () => {
     expect(cleanParam('  a \n\n b\t c      d ')).toBe('a b c d');
+  });
+});
+
+describe('named values', () => {
+  it('gives each value its WaSarathi variable name, so a template can leave some out', () => {
+    expect(buildTicketMessage(event, ticket).namedParams).toMatchObject({
+      BUYER: 'Asha Rao',
+      ORDERID: 'ORD-1001',
+      ORGANISER: 'Sangam Events',
+      PASSES: '4',
+    });
   });
 });

@@ -140,6 +140,25 @@ describe('WaSarathiSender', () => {
     expect(single.searchParams.get('templateVariable-PASSCODE-10')).toBe('ABCDEFGH2345');
   });
 
+  it('fills variables by name when the template leaves one out (no AMOUNT)', () => {
+    const link =
+      'https://panel.example/api/v1/whatsapp/send/template?apiToken=K&phone_number_id=1&template_id=2' +
+      '&templateVariable-BUYER-1=a&templateVariable-EVENT-2=a&templateVariable-DATE-3=a&templateVariable-STARTTIME-4=a' +
+      '&templateVariable-VENUECITY-5=a&templateVariable-PASSES-6=a&templateVariable-ORDERID-7=a&templateVariable-ORGANISER-8=a' +
+      '&templateVariable-PASSCODE-9=a&templateVariable-PASSCODE-10=a&phone_number=x';
+    const named = {
+      ...message,
+      namedParams: { BUYER: 'Asha Rao', EVENT: 'Winter Music Night', DATE: 'Saturday, 14 Nov 2026', STARTTIME: '18:00', VENUECITY: 'Palace Grounds, Bengaluru', PASSES: '4', AMOUNT: '3,196', ORDERID: 'ORD-1001', ORGANISER: 'Sangam Events' },
+    };
+    const url = buildWaSarathiUrl(link, named) as URL;
+    expect(url.searchParams.get('templateVariable-PASSES-6')).toBe('4');
+    expect(url.searchParams.get('templateVariable-ORDERID-7')).toBe('ORD-1001');
+    expect(url.searchParams.get('templateVariable-ORGANISER-8')).toBe('Sangam Events');
+    expect(url.searchParams.get('templateVariable-PASSCODE-9')).toBe('ABCDEFGH2345');
+    expect(url.searchParams.get('templateVariable-PASSCODE-10')).toBe('ABCDEFGH2345');
+    expect(url.toString()).not.toContain('3%2C196');
+  });
+
   it('fails without calling out when the template has no link or the wrong variables', async () => {
     const { impl, calls } = fakeFetch(200, { status: '1' });
     expect(await sender(impl).send({ ...message, template: 'event_reminder_v1' })).toMatchObject({

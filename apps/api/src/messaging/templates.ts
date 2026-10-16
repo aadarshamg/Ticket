@@ -21,6 +21,11 @@ export interface MessageTicket {
 
 const passUrl = (code: string) => `${env.PUBLIC_BASE_URL}/b/${code}`;
 
+/** Variable names for the body values, in the same order. */
+function named(names: string[], values: string[]): Record<string, string> {
+  return Object.fromEntries(names.map((name, index) => [name, values[index] ?? '']));
+}
+
 /** The date and times this booking's message should give: its own night's, or the event's. */
 function timesFor(event: Event, ticket: MessageTicket) {
   return bookingTimes(event, nightFromDb(ticket.night));
@@ -44,21 +49,23 @@ export function formatAmount(amount: Prisma.Decimal | null): string {
  */
 export function buildTicketMessage(event: Event, ticket: MessageTicket): OutboundMessage {
   const times = timesFor(event, ticket);
+  const bodyParams = [
+    ticket.name,
+    event.name,
+    formatIstDate(times.startsAt),
+    formatIstTime(times.startsAt),
+    `${event.venue}, ${event.city}`,
+    String(ticket.passCount),
+    formatAmount(ticket.amount),
+    ticket.orderId,
+    event.organiserName,
+  ].map(cleanParam);
   return {
     to: ticket.phone,
     template: TICKET_TEMPLATE,
     language: TEMPLATE_LANGUAGE,
-    bodyParams: [
-      ticket.name,
-      event.name,
-      formatIstDate(times.startsAt),
-      formatIstTime(times.startsAt),
-      `${event.venue}, ${event.city}`,
-      String(ticket.passCount),
-      formatAmount(ticket.amount),
-      ticket.orderId,
-      event.organiserName,
-    ].map(cleanParam),
+    bodyParams,
+    namedParams: named(['BUYER', 'EVENT', 'DATE', 'STARTTIME', 'VENUECITY', 'PASSES', 'AMOUNT', 'ORDERID', 'ORGANISER'], bodyParams),
     buttonUrlSuffix: ticket.code,
     passUrl: passUrl(ticket.code),
   };
@@ -71,20 +78,22 @@ export function buildTicketMessage(event: Event, ticket: MessageTicket): Outboun
  */
 export function buildReminderMessage(event: Event, ticket: MessageTicket, unusedPasses: number): OutboundMessage {
   const times = timesFor(event, ticket);
+  const reminderParams = [
+    ticket.name,
+    event.name,
+    formatIstDate(times.startsAt),
+    formatIstTime(times.startsAt),
+    `${event.venue}, ${event.city}`,
+    formatIstTime(times.gatesOpenAt),
+    String(unusedPasses),
+    event.organiserName,
+  ].map(cleanParam);
   return {
     to: ticket.phone,
     template: REMINDER_TEMPLATE,
     language: TEMPLATE_LANGUAGE,
-    bodyParams: [
-      ticket.name,
-      event.name,
-      formatIstDate(times.startsAt),
-      formatIstTime(times.startsAt),
-      `${event.venue}, ${event.city}`,
-      formatIstTime(times.gatesOpenAt),
-      String(unusedPasses),
-      event.organiserName,
-    ].map(cleanParam),
+    bodyParams: reminderParams,
+    namedParams: named(['BUYER', 'EVENT', 'DATE', 'STARTTIME', 'VENUECITY', 'GATESOPEN', 'UNUSEDPASSES', 'ORGANISER'], reminderParams),
     buttonUrlSuffix: ticket.code,
     passUrl: passUrl(ticket.code),
   };
