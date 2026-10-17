@@ -18,7 +18,7 @@ import {
   syncPending,
   type LocalVerdict,
 } from '@/lib/offline/scanner';
-import type { AdmitAllOutcome, GateSessionInfo, ScanBooking, ScanOutcome } from '@/lib/types';
+import type { GateSessionInfo, ScanOutcome } from '@/lib/types';
 
 const DEVICE_KEY = 'tk_device_id';
 /** Lets the scanner reopen while offline: the server cannot be asked who is signed in. */
@@ -39,8 +39,6 @@ interface ResultView {
   tone: Tone;
   title: string;
   lines: string[];
-  /** Set on a green result when more people on the booking are still to come. */
-  admitAll?: ScanBooking;
 }
 
 const TONE_CLASS: Record<Tone, string> = {
@@ -69,7 +67,6 @@ function toView(outcome: ScanOutcome): ResultView {
         tone: 'green',
         title: 'Admitted',
         lines: [...who, [position, remaining > 0 ? `${remaining} still to come` : 'all entered'].filter(Boolean).join(' · ')],
-        admitAll: booking && remaining > 0 ? booking : undefined,
       };
     }
     case 'already_used':
@@ -157,7 +154,6 @@ export default function ScanPage() {
   const [signingIn, setSigningIn] = useState(false);
   const [result, setResult] = useState<ResultView | null>(null);
   const [checking, setChecking] = useState(false);
-  const [admitting, setAdmitting] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [online, setOnline] = useState(true);
   const [offline, setOffline] = useState(offlineStatus());
@@ -393,37 +389,6 @@ export default function ScanPage() {
     [show, dismiss, endSession],
   );
 
-  async function admitAll(booking: ScanBooking) {
-    if (timerRef.current) clearTimeout(timerRef.current); // stay on this screen while it works
-    setAdmitting(true);
-    try {
-      const outcome = await api<AdmitAllOutcome>('/api/scan/admit-all', { method: 'POST', body: { ticketId: booking.ticketId } });
-      show(
-        outcome.admitted > 0
-          ? {
-              tone: 'green',
-              title: `Admitted ${outcome.admitted} more`,
-              lines: [booking.name, `All ${outcome.booking.passCount} have entered`],
-            }
-          : outcome.wrongNight
-            ? {
-                tone: 'red',
-                title: 'Wrong night',
-                lines: [
-                  booking.name,
-                  outcome.booking.night ? `This booking is for ${formatNight(outcome.booking.night)}` : 'This booking is for another night',
-                ],
-              }
-            : { tone: 'red', title: 'Nobody left to admit', lines: [booking.name, 'Everyone on this booking has already entered'] },
-      );
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) return endSession();
-      show({ tone: 'grey', title: 'Not done', lines: ['Could not admit the rest. Try again, or scan each pass.'] });
-    } finally {
-      setAdmitting(false);
-    }
-  }
-
   async function signIn(event: FormEvent) {
     event.preventDefault();
     primeAudio(); // this tap is what allows the beeps to play later
@@ -633,16 +598,6 @@ export default function ScanPage() {
             </p>
           ))}
           <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
-            {result.admitAll && (
-              <button
-                type="button"
-                disabled={admitting}
-                onClick={() => admitAll(result.admitAll as ScanBooking)}
-                className="rounded-xl bg-white px-4 py-4 text-lg font-bold text-emerald-700 disabled:opacity-70"
-              >
-                {admitting ? 'Admitting…' : `Admit all remaining (${result.admitAll.remaining})`}
-              </button>
-            )}
             <button type="button" onClick={dismiss} className="rounded-xl border-2 border-current px-4 py-3 text-base font-semibold">
               Next scan
             </button>
