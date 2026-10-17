@@ -217,7 +217,7 @@ the camera, and point it at a pass. The whole screen shows the result:
 
 | Screen | Meaning |
 |---|---|
-| Green **Admitted** | Name, category, "Pass 2 of 4 · 2 still to come". |
+| Green **Admitted** | Name, category, "Pass 2 of 4 · 2 still to come". **Admit all remaining (N)** admits the rest of the group in one tap. |
 | Red **Already used** | Time and gate of the first entry. Do not admit. |
 | Red **Invalid pass** | Not a pass issued by this system (forged, altered, or some other QR code). |
 | Amber **Cancelled** | The booking was cancelled. Do not admit. |
@@ -265,8 +265,8 @@ Then, per scan:
 4. Stored entries upload by themselves when the connection returns (checked every 15 seconds),
    and the list is refreshed. The scanner shows how many are still waiting.
 
-A fully offline phone can reopen `/scan` and carry on without the PIN. **Find booking** needs a
-connection.
+A fully offline phone can reopen `/scan` and carry on without the PIN. **Find booking** and
+**Admit all remaining** need a connection.
 
 What makes this safe:
 
